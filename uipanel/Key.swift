@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftUtil
+import UIPanel
 
 // Google Pinyin 4.5.2: backspace repeats every 50 ms after a 400 ms hold.
 let keyRepeatInterval = 0.05
@@ -47,6 +48,18 @@ func typeKey(_ key: String, _ code: String) {
     client.forwardKey(key, code)
   } else {
     client.keyPressed(key, code)
+  }
+}
+
+/// Google Pinyin commits key symbols and long press items as they are (PLAIN_TEXT), e.g.
+/// m's "." stays "." in Chinese; while composing, the first candidate goes first.
+@MainActor
+func commitPlainText(_ text: String) {
+  vm.resetLayerIfNotLocked()
+  if vm.hasPreedit && !vm.englishMode {
+    commitFirstCandidateAndText(vm.inputContext, text)
+  } else {
+    client.commitString(text)
   }
 }
 
@@ -211,15 +224,26 @@ struct AlphabetKeyView: View {
           return true
         },
         onLongPress: { index in
-          if index >= 0, index < items.count {
-            performPopupItem(items[index])
+          if index >= 0, index < alternates.count {
+            let text = alternates[index]
+            if text == "\"" {
+              vm.resetLayerIfNotLocked()
+              typeKey(text, "")
+            } else {
+              commitPlainText(text)
+            }
           }
         },
         onSwipe: { direction in
           switch direction {
           case .up:
-            vm.resetLayerIfNotLocked()
-            typeKey(alt, "")
+            // c's quote is decoded by fcitx into Chinese quotes, like Google Pinyin.
+            if alt == "\"" {
+              vm.resetLayerIfNotLocked()
+              typeKey(alt, "")
+            } else {
+              commitPlainText(alt)
+            }
           case .down:
             vm.resetLayerIfNotLocked()
             if viewModel.hasPreedit {
@@ -241,6 +265,7 @@ struct AlphabetKeyView: View {
 /// fcitx5-android `SymbolKey`.
 struct SymbolKeyView: View {
   @Environment(\.colorScheme) var colorScheme
+  @ObservedObject private var viewModel = vm
   let x: CGFloat
   let y: CGFloat
   let width: CGFloat
@@ -250,8 +275,10 @@ struct SymbolKeyView: View {
   let variant: KeyVariant
 
   var body: some View {
-    let items = (popupPreset[symbol] ?? []).map { BubbleItem.text($0) }
-    Text(symbol)
+    let options = popupPreset[symbol] ?? []
+    let items = options.map { BubbleItem.text($0) }
+    // Google Pinyin shows 。 on the period key in Chinese; fcitx converts it when typed.
+    Text(symbol == "." && !viewModel.englishMode ? "。" : symbol)
       .font(.system(size: getKeyLabelFontSize(height)))
       .keyTile(
         x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
@@ -263,8 +290,9 @@ struct SymbolKeyView: View {
             }
           },
           onLongPress: { index in
-            if index >= 0, index < items.count {
-              performPopupItem(items[index])
+            // Google Pinyin commits these as they are (PLAIN_TEXT).
+            if index >= 0, index < options.count {
+              commitPlainText(options[index])
             }
           }
         ),
@@ -276,6 +304,7 @@ struct SymbolKeyView: View {
 /// Emoji / QuickPhrase / Unicode long press menu.
 struct CommaKeyView: View {
   @Environment(\.colorScheme) var colorScheme
+  @ObservedObject private var viewModel = vm
   let x: CGFloat
   let y: CGFloat
   let width: CGFloat
@@ -294,7 +323,7 @@ struct CommaKeyView: View {
         .font(.system(size: 13))
         .padding(.top, 4)
       Spacer(minLength: 0)
-      Text(",").font(.system(size: getKeyLabelFontSize(height)))
+      Text(viewModel.englishMode ? "," : "，").font(.system(size: getKeyLabelFontSize(height)))
         .padding(.bottom, 4)
     }
     .keyTile(

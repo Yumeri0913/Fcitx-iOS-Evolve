@@ -403,6 +403,21 @@ void selectCandidate(const char *inputContext, int index) {
     });
 }
 
+void commitFirstCandidateAndText(const char *inputContext, const char *text) {
+    std::string token = inputContext, str = text;
+    dispatcher->schedule([=] {
+        auto *ic = fcitx::findInputContext(instance.get(), token);
+        if (!ic) {
+            return;
+        }
+        if (const auto &list = ic->inputPanel().candidateList();
+            list && list->size() > 0) {
+            list->candidate(0).select(ic);
+        }
+        ic->commitString(str);
+    });
+}
+
 void activateStatusAreaAction(const char *inputContext, int id) {
     std::string token = inputContext;
     dispatcher->schedule([=] {
