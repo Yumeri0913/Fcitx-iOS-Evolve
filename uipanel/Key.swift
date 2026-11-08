@@ -120,7 +120,7 @@ struct AlphabetKeyView: View {
     let fontSize = getKeyLabelFontSize(height)
     let altText = Text(alt)
       .font(.system(size: altLabelFontSize, weight: .bold))
-      .foregroundColor(theme.altKeyTextColor)
+      .foregroundColor(theme.keyHintColor)
     let landscape = getKeyboardState() == .landscape
 
     Group {
@@ -480,7 +480,8 @@ func returnKeySymbol(_ type: UIReturnKeyType?) -> String {
   }
 }
 
-/// fcitx5-android `ReturnKey`: accent colored with an action icon.
+/// fcitx5-android `ReturnKey` with an action icon. Google Pinyin always colors it;
+/// iOS only does for actions like search or send.
 struct EnterView: View {
   @Environment(\.colorScheme) var colorScheme
   let x: CGFloat
@@ -497,12 +498,13 @@ struct EnterView: View {
     let returnLabel = NSLocalizedString("return", comment: "")
     let symbol = cr ? "return" : returnKeySymbol(returnKeyType)
     let hasReturnLongPress = !cr && symbol != "return"
+    let variant: KeyVariant = themeStyle == .ios && symbol == "return" ? .normal : .accent
     Image(systemName: symbol)
       .resizable()
       .aspectRatio(contentMode: .fit)
       .frame(height: keyIconHeight(height))
       .keyTile(
-        x: x, y: y, width: width, height: height, variant: .accent, colorScheme: colorScheme,
+        x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
         action: GestureAction(
           onTap: {
             vm.resetLayerIfNotLocked()

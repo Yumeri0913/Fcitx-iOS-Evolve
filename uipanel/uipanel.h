@@ -12,7 +12,12 @@
 
 namespace fcitx {
 
-// Google Pinyin style skin settings: light / dark palette and key border.
+// iOS follows the system keyboard (translucent, rounded keys); Google Pinyin is
+// its Material skin.
+enum class ThemeStyle { IOS, GooglePinyin };
+FCITX_CONFIG_ENUM_NAME_WITH_I18N(ThemeStyle, N_("iOS"), N_("Google Pinyin"));
+
+// Light / dark palette and key border.
 enum class ThemeMode { FollowSystem, Light, Dark };
 FCITX_CONFIG_ENUM_NAME_WITH_I18N(ThemeMode, N_("Follow system"), N_("Light"),
                                  N_("Dark"));
@@ -29,9 +34,21 @@ FCITX_CONFIG_ENUM_NAME_WITH_I18N(VibrationStrength, N_("Weak"), N_("Medium"),
 
 FCITX_CONFIGURATION(
     UIPanelConfig,
+    OptionWithAnnotation<ThemeStyle, ThemeStyleI18NAnnotation> themeStyle{
+        this, "ThemeStyle", _("Theme style"), ThemeStyle::IOS};
     OptionWithAnnotation<ThemeMode, ThemeModeI18NAnnotation> theme{
         this, "Theme", _("Theme"), ThemeMode::FollowSystem};
-    Option<bool> keyBorder{this, "KeyBorder", _("Key border"), false};
+    Option<bool> keyBorder{this, "KeyBorder", _("Key border (Google Pinyin)"),
+                           false};
+    Option<int, IntConstrain, DefaultMarshaller<int>, ToolTipAnnotation>
+        keyRadius{this,
+                  "KeyRadius",
+                  _("Key corner radius"),
+                  -1,
+                  IntConstrain(-1, 24),
+                  {},
+                  {_("-1 follows the theme style: 8.5 for iOS, 2 for Google "
+                     "Pinyin.")}};
     OptionWithAnnotation<HeightMode, HeightModeI18NAnnotation> heightMode{
         this, "HeightMode", _("Keyboard height"), HeightMode::GooglePinyin};
     Option<bool> vibrate{this, "Vibrate", _("Vibrate on keypress"), true};

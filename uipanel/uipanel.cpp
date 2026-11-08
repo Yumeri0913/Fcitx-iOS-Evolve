@@ -74,8 +74,9 @@ void UIPanel::setConfig(const RawConfig &config) {
 }
 
 void UIPanel::applyConfig() {
-    KeyboardUI::setThemeConfigAsync(static_cast<int>(*config_.theme),
-                                    *config_.keyBorder);
+    KeyboardUI::setThemeConfigAsync(static_cast<int>(*config_.themeStyle),
+                                    static_cast<int>(*config_.theme),
+                                    *config_.keyBorder, *config_.keyRadius);
     KeyboardUI::setKeyboardHeightModeAsync(
         static_cast<int>(*config_.heightMode));
     KeyboardUI::setVibrationAsync(

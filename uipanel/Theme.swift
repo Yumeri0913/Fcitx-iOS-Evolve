@@ -36,6 +36,11 @@ struct Theme {
   let genericActiveBackgroundColor: Color
   let genericActiveForegroundColor: Color
 
+  /// Small symbol printed on letter keys.
+  let keyHintColor: Color
+  /// Key corner radius when the user keeps the theme default.
+  let keyRadius: CGFloat
+
   init(
     name: String, isDark: Bool,
     backgroundColor: UInt32, barColor: UInt32, keyboardColor: UInt32,
@@ -46,7 +51,8 @@ struct Theme {
     keyPressHighlightColor: UInt32, keyShadowColor: UInt32,
     popupBackgroundColor: UInt32, popupTextColor: UInt32,
     spaceBarColor: UInt32, dividerColor: UInt32, clipboardEntryColor: UInt32,
-    genericActiveBackgroundColor: UInt32, genericActiveForegroundColor: UInt32
+    genericActiveBackgroundColor: UInt32, genericActiveForegroundColor: UInt32,
+    keyHintColor: UInt32? = nil, keyRadius: CGFloat = 2
   ) {
     self.name = name
     self.isDark = isDark
@@ -71,6 +77,8 @@ struct Theme {
     self.clipboardEntryColor = Color(argb: clipboardEntryColor)
     self.genericActiveBackgroundColor = Color(argb: genericActiveBackgroundColor)
     self.genericActiveForegroundColor = Color(argb: genericActiveForegroundColor)
+    self.keyHintColor = Color(argb: keyHintColor ?? altKeyTextColor)
+    self.keyRadius = keyRadius
   }
 }
 
@@ -117,6 +125,51 @@ enum ThemePreset {
     genericActiveBackgroundColor: 0xff4d_b6ac, genericActiveForegroundColor: 0xffff_ffff)
 }
 
+extension ThemePreset {
+  // The iOS 26 system keyboard, measured on the simulator: a transparent background
+  // lets the system's translucent keyboard backdrop show through; all keys share one
+  // fill without shadow and have about 8.5 pt corners. The return key is only blue
+  // for actions like search or send.
+  static let iosLight = Theme(
+    name: "iOSLight", isDark: false,
+    backgroundColor: 0x0100_0000, barColor: 0x0100_0000, keyboardColor: 0x0100_0000,
+    keyBackgroundColor: 0xffff_ffff, keyTextColor: 0xff00_0000,
+    candidateTextColor: 0xff00_0000, candidateLabelColor: 0xff00_0000,
+    candidateCommentColor: 0xff8e_8e93,
+    altKeyBackgroundColor: 0xffff_ffff, altKeyTextColor: 0xff00_0000,
+    accentKeyBackgroundColor: 0xff00_7aff, accentKeyTextColor: 0xffff_ffff,
+    keyPressHighlightColor: 0x2600_0000, keyShadowColor: 0x0000_0000,
+    popupBackgroundColor: 0xffff_ffff, popupTextColor: 0xff00_0000,
+    spaceBarColor: 0xffff_ffff, dividerColor: 0x2600_0000, clipboardEntryColor: 0xffff_ffff,
+    genericActiveBackgroundColor: 0xff00_7aff, genericActiveForegroundColor: 0xffff_ffff,
+    keyHintColor: 0xff8e_8e93, keyRadius: 8.5)
+
+  static let iosDark = Theme(
+    name: "iOSDark", isDark: true,
+    backgroundColor: 0x0100_0000, barColor: 0x0100_0000, keyboardColor: 0x0100_0000,
+    keyBackgroundColor: 0xff60_6061, keyTextColor: 0xffff_ffff,
+    candidateTextColor: 0xffff_ffff, candidateLabelColor: 0xffff_ffff,
+    candidateCommentColor: 0xff98_989f,
+    altKeyBackgroundColor: 0xff60_6061, altKeyTextColor: 0xffff_ffff,
+    accentKeyBackgroundColor: 0xff0a_84ff, accentKeyTextColor: 0xffff_ffff,
+    keyPressHighlightColor: 0x33ff_ffff, keyShadowColor: 0x0000_0000,
+    popupBackgroundColor: 0xff60_6061, popupTextColor: 0xffff_ffff,
+    spaceBarColor: 0xff60_6061, dividerColor: 0x33ff_ffff, clipboardEntryColor: 0xff60_6061,
+    genericActiveBackgroundColor: 0xff0a_84ff, genericActiveForegroundColor: 0xffff_ffff,
+    keyHintColor: 0xff98_989f, keyRadius: 8.5)
+}
+
+// Same values and order as the uipanel addon's ThemeStyle option.
+enum ThemeStyle: Int {
+  case ios = 0
+  case googlePinyin = 1
+}
+
+// Set from the addon config on the main thread before views read them.
+nonisolated(unsafe) var themeStyle = ThemeStyle.ios
+/// User key radius in pt, or negative to use the theme's.
+nonisolated(unsafe) var keyRadiusSetting = -1
+
 // Google Pinyin skins: light, dark, or follow the system appearance.
 // Matches the `Theme` option of the uipanel addon config.
 enum ThemeMode: Int {
@@ -136,11 +189,17 @@ enum ThemeMode: Int {
   }
 }
 
-let lightTheme = ThemePreset.googlePinyinLight
-let darkTheme = ThemePreset.googlePinyinDark
-
 func currentTheme(_ colorScheme: ColorScheme) -> Theme {
-  return colorScheme == .dark ? darkTheme : lightTheme
+  switch themeStyle {
+  case .ios:
+    return colorScheme == .dark ? ThemePreset.iosDark : ThemePreset.iosLight
+  case .googlePinyin:
+    return colorScheme == .dark ? ThemePreset.googlePinyinDark : ThemePreset.googlePinyinLight
+  }
+}
+
+var keyCornerRadius: CGFloat {
+  keyRadiusSetting >= 0 ? CGFloat(keyRadiusSetting) : currentTheme(.light).keyRadius
 }
 
 // Google Pinyin "按键边框": bordered key tiles with a bottom shadow.

@@ -2,8 +2,7 @@ import SwiftUI
 
 // Geometry follows fcitx5-android's ThemePrefs / KeyDef defaults (1 dp ≈ 1 pt).
 
-// key_radius, 2 dp like Google Pinyin
-let keyCornerRadius: CGFloat = 2
+// key_radius: keyCornerRadius in Theme.swift, 2 dp like Google Pinyin or iOS's 8.5 pt.
 // fcitx5-android insets every side of a key by the margin, so the gap between
 // neighbouring keys is twice the preference value.
 let columnGap: CGFloat = 6  // key_horizontal_margin 3 dp

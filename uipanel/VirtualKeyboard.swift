@@ -90,6 +90,9 @@ public class ViewModel: ObservableObject {
   @Published var layer = "default"
   @Published var themeMode = ThemeMode.followSystem
   @Published var keyBorder = false
+  // Theme style and key radius live in globals read by every view; bumping this
+  // rebuilds the keyboard when they change.
+  @Published var themeRevision = 0
   // Google Pinyin 中/英: English mode sends keys straight to the app, like
   // fcitx5-android's inactive keyboard-us. Starts in Chinese (ActiveByDefault).
   @Published var englishMode = false
@@ -244,7 +247,12 @@ public class ViewModel: ObservableObject {
     }
   }
 
-  func setThemeConfig(_ mode: ThemeMode, _ keyBorder: Bool) {
+  func setThemeConfig(_ style: ThemeStyle, _ mode: ThemeMode, _ keyBorder: Bool, _ keyRadius: Int) {
+    if themeStyle != style || keyRadiusSetting != keyRadius {
+      themeStyle = style
+      keyRadiusSetting = keyRadius
+      themeRevision += 1
+    }
     themeMode = mode
     self.keyBorder = keyBorder
   }
@@ -636,7 +644,9 @@ public struct VirtualKeyboardView: View {
         }
       }
       .environment(\.totalHeight, viewModel.totalHeight)
-      .environment(\.keyBorder, viewModel.keyBorder)
+      .id(viewModel.themeRevision)
+      // iOS keys are always tiles; the option is Google Pinyin's.
+      .environment(\.keyBorder, themeStyle == .ios || viewModel.keyBorder)
       .environment(\.colorScheme, viewModel.themeMode.resolve(colorScheme))
   }
 

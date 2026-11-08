@@ -64,8 +64,8 @@ msgid "Dark"
 msgstr "深色"
 
 #: uipanel/uipanel.h
-msgid "Key border"
-msgstr "按键边框"
+msgid "Key border (Google Pinyin)"
+msgstr "按键边框（谷歌拼音风格）"
 
 #: uipanel/uipanel.h
 msgid "Keyboard height"
@@ -98,3 +98,23 @@ msgstr "中"
 #: uipanel/uipanel.h
 msgid "Strong"
 msgstr "强"
+
+#: uipanel/uipanel.h
+msgid "Theme style"
+msgstr "主题风格"
+
+#: uipanel/uipanel.h
+msgid "iOS"
+msgstr "iOS"
+
+#: uipanel/uipanel.h
+msgid "Google Pinyin"
+msgstr "谷歌拼音"
+
+#: uipanel/uipanel.h
+msgid "Key corner radius"
+msgstr "按键圆角半径"
+
+#: uipanel/uipanel.h
+msgid "-1 follows the theme style: 8.5 for iOS, 2 for Google Pinyin."
+msgstr "-1 表示跟随主题风格：iOS 为 8.5，谷歌拼音为 2。"
