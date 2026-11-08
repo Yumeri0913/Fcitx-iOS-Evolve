@@ -82,11 +82,15 @@ private final class QuickSettings: ObservableObject {
   @Published var uipanel = [String: Any]()
   @Published var traditional = false
   @Published var scheme = ""
+  @Published var hasShuangpin = false
 
   func reload() {
     pinyin = getConfig(pinyinUri)
     uipanel = getConfig(uipanelUri)
     let ims = enabledInputMethodNames()
+    hasShuangpin = deserialize([InputMethod].self, String(getAllInputMethods())).contains {
+      $0.name == "shuangpin"
+    }
     traditional = chttransEnabledIMs().contains { $0 == "pinyin" || $0 == "shuangpin" }
     if ims.contains("shuangpin") && !ims.contains("pinyin") {
       scheme = optionValue(pinyin, "ShuangpinProfile") ?? "MS"
@@ -208,9 +212,12 @@ struct QuickSettingsView: View {
       }
 
       Section {
-        Picker("Pinyin scheme", selection: settings.schemeBinding) {
-          ForEach(pinyinSchemes, id: \.value) { scheme in
-            Text(NSLocalizedString(scheme.label, comment: "")).tag(scheme.value)
+        // Builds with PINYIN_ONLY have no shuangpin.
+        if settings.hasShuangpin {
+          Picker("Pinyin scheme", selection: settings.schemeBinding) {
+            ForEach(pinyinSchemes, id: \.value) { scheme in
+              Text(NSLocalizedString(scheme.label, comment: "")).tag(scheme.value)
+            }
           }
         }
         Toggle("Traditional Chinese", isOn: settings.traditionalBinding)

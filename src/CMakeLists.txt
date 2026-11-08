@@ -62,20 +62,24 @@ if (CHINESE_ADDONS)
     # Pinyin addon, im and lua
     copy_to(Chinese copy "${CHINESE_ADDONS_BINARY_DIR}/im/pinyin/pinyin-addon.conf" "${ADDON_PREFIX}/pinyin.conf")
     copy_to(Chinese copy "${CHINESE_ADDONS_BINARY_DIR}/im/pinyin/pinyin.conf" "${IM_PREFIX}/pinyin.conf")
-    copy_to(Chinese copy "${CHINESE_ADDONS_BINARY_DIR}/im/pinyin/shuangpin.conf" "${IM_PREFIX}/shuangpin.conf")
+    if (NOT PINYIN_ONLY)
+        copy_to(Chinese copy "${CHINESE_ADDONS_BINARY_DIR}/im/pinyin/shuangpin.conf" "${IM_PREFIX}/shuangpin.conf")
+    endif()
     copy_to(Chinese copy "${ENGINES_SOURCE_DIR}/fcitx5-chinese-addons/im/pinyin/pinyin.lua" "share/fcitx5/lua/imeapi/extensions/pinyin.lua")
 
-    # Table addon, im and dict
-    copy_to(Chinese copy "${CHINESE_ADDONS_BINARY_DIR}/im/table/table.conf" "share/fcitx5/addon/table.conf")
-    # Filter out wanfeng, erbi, cangjie and qxm.
-    copy_share_to(Chinese copy "fcitx5/inputmethod/db.conf")
-    copy_share_to(Chinese copy "libime/db.main.dict")
-    copy_share_to(Chinese copy "fcitx5/inputmethod/wbx.conf")
-    copy_share_to(Chinese copy "libime/wbx.main.dict")
-    copy_share_to(Chinese copy "fcitx5/inputmethod/wbpy.conf")
-    copy_share_to(Chinese copy "libime/wbpy.main.dict")
-    copy_share_to(Chinese copy "fcitx5/inputmethod/zrm.conf")
-    copy_share_to(Chinese copy "libime/zrm.main.dict")
+    if (NOT PINYIN_ONLY)
+        # Table addon, im and dict
+        copy_to(Chinese copy "${CHINESE_ADDONS_BINARY_DIR}/im/table/table.conf" "share/fcitx5/addon/table.conf")
+        # Filter out wanfeng, erbi, cangjie and qxm.
+        copy_share_to(Chinese copy "fcitx5/inputmethod/db.conf")
+        copy_share_to(Chinese copy "libime/db.main.dict")
+        copy_share_to(Chinese copy "fcitx5/inputmethod/wbx.conf")
+        copy_share_to(Chinese copy "libime/wbx.main.dict")
+        copy_share_to(Chinese copy "fcitx5/inputmethod/wbpy.conf")
+        copy_share_to(Chinese copy "libime/wbpy.main.dict")
+        copy_share_to(Chinese copy "fcitx5/inputmethod/zrm.conf")
+        copy_share_to(Chinese copy "libime/zrm.main.dict")
+    endif()
 
     # Module addons
     copy_to(Chinese copy "${CHINESE_ADDONS_BINARY_DIR}/modules/pinyinhelper/pinyinhelper.conf" "share/fcitx5/addon/pinyinhelper.conf")

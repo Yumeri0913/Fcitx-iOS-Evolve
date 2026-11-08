@@ -98,6 +98,8 @@ option(CHINESE_ADDONS "" ON)
 option(HALLELUJAH "" ON)
 option(MOZC "" ON)
 option(RIME "" ON)
+# Only full pinyin in the Chinese keyboard: no shuangpin or table input methods.
+option(PINYIN_ONLY "" OFF)
 
 function(copy_to bundle cmd file relative_path)
     if ("${bundle}" STREQUAL "app")
@@ -152,6 +154,11 @@ fcitx5_add_i18n_definition(TARGETS iosfrontend uipanel)
 target_compile_definitions(iosfrontend PRIVATE -DFCITX_GETTEXT_DOMAIN=\"fcitx5-ios\")
 target_compile_definitions(uipanel PRIVATE -DFCITX_GETTEXT_DOMAIN=\"fcitx5-ios\")
 
+# fcitx5_import_addons links addons built in subdirectories into FcitxRuntime, which
+# needs CMP0079. Functions keep the policies of where they were defined, and the fcitx5
+# subproject defines them with old ones; the Hallelujah, Mozc and Rime engines used to
+# redefine them, so builds without those failed. Redefine them here.
+include("${PROJECT_SOURCE_DIR}/cmake/Fcitx5Utils/Fcitx5Macros.cmake")
 get_property(RUNTIME_ADDONS GLOBAL PROPERTY FCITX_RUNTIME_ADDONS)
 fcitx5_import_addons(FcitxRuntime
     REGISTRY_VARNAME getStaticAddon
