@@ -81,6 +81,7 @@ public class ViewModel: ObservableObject {
   @Published var enterLabel = ""
   @Published var enterHighlight = false
   @Published var returnKeyType: UIReturnKeyType? = nil
+  @Published var urlOrEmail = false
   @Published var textIsEmpty = false
   @Published var canUndo = false
   @Published var canRedo = false
@@ -388,6 +389,13 @@ public class ViewModel: ObservableObject {
       FCITX_ERROR("Clipboard operation failed: \(error)")
       clipboardError = error.localizedDescription
       return nil
+    }
+  }
+
+  public func setKeyboardType(_ type: UIKeyboardType?) {
+    let urlOrEmail = type == .URL || type == .emailAddress
+    if self.urlOrEmail != urlOrEmail {
+      self.urlOrEmail = urlOrEmail
     }
   }
 

@@ -70,6 +70,8 @@ struct KeyModifier: ViewModifier {
   let pressedView: (any View)?
   let bubbleLabel: String?
   let swipeLabel: String?
+  /// Shown when swiping up instead of swipeLabel.
+  let swipeUpLabel: String?
   let longPressItems: [BubbleItem]
   let longPressIndex: Int
   var bubbleX: CGFloat { x + width / 2 }
@@ -214,10 +216,12 @@ struct KeyModifier: ViewModifier {
       }
       if didMoveFarEnough {
         let direction = getSwipeDirection(dx, dy)
-        if direction == .up || direction == .down, let swipeLabel {
+        if direction == .up || direction == .down,
+          let label = direction == .up ? swipeUpLabel ?? swipeLabel : swipeLabel
+        {
           vm.setBubble(
             bubbleX, bubbleY, bubbleWidth, bubbleHeight, popupBackground,
-            colorScheme, popupShadow, swipeLabel, [], 0, 0, bubbleFontSize)
+            colorScheme, popupShadow, label, [], 0, 0, bubbleFontSize)
         } else {
           clearBubble()
         }
@@ -370,7 +374,7 @@ extension View {
     radius: CGFloat = keyCornerRadius, background: Color,
     foreground: Color, highlight: Color, shadow: Color, action: GestureAction,
     pressedView: (any View)? = nil, bubbleLabel: String? = nil,
-    swipeLabel: String? = nil,
+    swipeLabel: String? = nil, swipeUpLabel: String? = nil,
     longPressItems: [BubbleItem]? = nil, longPressIndex: Int? = nil,
     bubbleBackground: Color? = nil, bubbleFontSize: CGFloat? = nil, disable: Bool = false
   ) -> some View {
@@ -382,7 +386,7 @@ extension View {
         bubbleFontSize: bubbleFontSize,
         foreground: foreground, highlight: highlight,
         shadow: shadow, action: action, disable: disable, pressedView: pressedView,
-        bubbleLabel: bubbleLabel, swipeLabel: swipeLabel,
+        bubbleLabel: bubbleLabel, swipeLabel: swipeLabel, swipeUpLabel: swipeUpLabel,
         longPressItems: longPressItems ?? [],
         longPressIndex: longPressIndex ?? 0
       )

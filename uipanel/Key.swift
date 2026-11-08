@@ -78,6 +78,7 @@ extension View {
     variant: KeyVariant, colorScheme: ColorScheme, action: GestureAction,
     hMargin: CGFloat = columnGap, vMargin: CGFloat? = nil, radius: CGFloat = keyCornerRadius,
     pressedView: (any View)? = nil, bubbleLabel: String? = nil, swipeLabel: String? = nil,
+    swipeUpLabel: String? = nil,
     longPressItems: [BubbleItem]? = nil, longPressIndex: Int? = nil,
     bubbleFontSize: CGFloat? = nil, disable: Bool = false
   ) -> some View {
@@ -90,14 +91,17 @@ extension View {
       highlight: theme.keyPressHighlightColor,
       shadow: theme.keyShadowColor,
       action: action, pressedView: pressedView, bubbleLabel: bubbleLabel,
-      swipeLabel: swipeLabel, longPressItems: longPressItems, longPressIndex: longPressIndex,
+      swipeLabel: swipeLabel, swipeUpLabel: swipeUpLabel, longPressItems: longPressItems,
+      longPressIndex: longPressIndex,
       bubbleFontSize: bubbleFontSize, disable: disable)
   }
 }
 
-/// fcitx5-android `AlphabetKey`: a letter with a punctuation alt label.
-/// Swipe inputs the punctuation, long press shows `popupPreset` alternates.
+/// fcitx5-android `AlphabetKey` with Google Pinyin's gestures: swipe down inputs the
+/// symbol printed on the key, swipe up commits the letter itself, long press shows
+/// `popupPreset` alternates.
 struct AlphabetKeyView: View {
+  @ObservedObject private var viewModel = vm
   @Environment(\.colorScheme) var colorScheme
   let x: CGFloat
   let y: CGFloat
@@ -112,10 +116,22 @@ struct AlphabetKeyView: View {
     shifted ? letter.uppercased() : letter.lowercased()
   }
 
+  /// Google Pinyin's URL and email keyboards put , and _ on z and m.
+  private var symbol: String {
+    guard viewModel.urlOrEmail else { return alt }
+    switch letter.lowercased() {
+    case "z": return ","
+    case "m": return "_"
+    default: return alt
+    }
+  }
+
   var body: some View {
     let theme = currentTheme(colorScheme)
     let letter = displayLetter
-    let alternates = popupPreset[letter] ?? [alt]
+    let alt = symbol
+    // The first long press item is the slide-down symbol.
+    let alternates = [alt] + (popupPreset[letter] ?? []).dropFirst()
     let items = alternates.map { BubbleItem.text($0) }
     let fontSize = getKeyLabelFontSize(height)
     let altText = Text(alt)
@@ -155,13 +171,25 @@ struct AlphabetKeyView: View {
           }
         },
         onSwipe: { direction in
-          if direction == .up || direction == .down {
+          switch direction {
+          case .down:
             vm.resetLayerIfNotLocked()
             typeKey(alt, "")
+          case .up:
+            vm.resetLayerIfNotLocked()
+            if viewModel.hasPreedit {
+              typeKey(letter, "Key\(self.letter.uppercased())")
+            } else {
+              // Commit the letter as is, even in Chinese mode.
+              client.forwardKey(letter, "")
+            }
+          default:
+            break
           }
         }
       ),
-      bubbleLabel: letter, swipeLabel: alt, longPressItems: items, longPressIndex: 0)
+      bubbleLabel: letter, swipeLabel: alt, swipeUpLabel: letter, longPressItems: items,
+      longPressIndex: 0)
   }
 }
 
@@ -571,6 +599,28 @@ struct CapsKeyView: View {
         }
       )
     )
+  }
+}
+
+/// Google Pinyin `softkey_ci`: inputs the pinyin syllable separator ' while composing.
+struct SeparatorKeyView: View {
+  @Environment(\.colorScheme) var colorScheme
+  let x: CGFloat
+  let y: CGFloat
+  let width: CGFloat
+  let height: CGFloat
+
+  var body: some View {
+    Text("'词")
+      .font(.system(size: layoutSwitchFontSize, weight: .medium))
+      .accessibilityLabel(NSLocalizedString("Separator", comment: ""))
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: .alternative,
+        colorScheme: colorScheme,
+        action: GestureAction(
+          onOrderedKeyPress: {
+            return { typeKey("'", "Quote") }
+          }))
   }
 }
 

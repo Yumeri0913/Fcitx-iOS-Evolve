@@ -63,9 +63,15 @@ struct KeyboardRowsView: View {
     case .comma:
       CommaKeyView(x: x, y: y, width: width, height: height, variant: def.variant)
     case .caps:
-      CapsKeyView(
-        x: x, y: y, width: width, height: height,
-        state: shifted ? (lock ? .capslock : .shift) : .normal)
+      // Google Pinyin turns shift into the syllable separator while composing,
+      // unless caps lock is on.
+      if hasPreedit && !(shifted && lock) && !vm.englishMode {
+        SeparatorKeyView(x: x, y: y, width: width, height: height)
+      } else {
+        CapsKeyView(
+          x: x, y: y, width: width, height: height,
+          state: shifted ? (lock ? .capslock : .shift) : .normal)
+      }
     case .backspace:
       BackspaceView(x: x, y: y, width: width, height: height, variant: def.variant)
     case .layoutSwitch(let label, let target):

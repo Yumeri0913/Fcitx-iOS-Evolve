@@ -66,7 +66,8 @@ private func numPad(
 }
 
 enum KeyboardLayouts {
-  // TextKeyboard.Layout
+  // TextKeyboard.Layout with Google Pinyin 4.5.2's slide-down symbols
+  // (softkeys_input_zh_pinyin_qwerty.xml).
   static let text: [[KeyDef]] = [
     [
       alphabet("q", "1"), alphabet("w", "2"), alphabet("e", "3"), alphabet("r", "4"),
@@ -75,13 +76,13 @@ enum KeyboardLayouts {
     ],
     [
       alphabet("a", "@"), alphabet("s", "*"), alphabet("d", "+"), alphabet("f", "-"),
-      alphabet("g", "="), alphabet("h", "/"), alphabet("j", "#"), alphabet("k", "("),
-      alphabet("l", ")"),
+      alphabet("g", "="), alphabet("h", "/"), alphabet("j", "#"), alphabet("k", "（"),
+      alphabet("l", "）"),
     ],
     [
       KeyDef(.caps, width: 0.15, variant: .alternative),
-      alphabet("z", "'"), alphabet("x", ":"), alphabet("c", "\""), alphabet("v", "?"),
-      alphabet("b", "!"), alphabet("n", "~"), alphabet("m", "\\"),
+      alphabet("z", "、"), alphabet("x", "："), alphabet("c", "\""), alphabet("v", "？"),
+      alphabet("b", "！"), alphabet("n", "～"), alphabet("m", "."),
       KeyDef(.backspace, width: 0.15, variant: .alternative),
     ],
     [
@@ -135,63 +136,63 @@ enum KeyboardLayouts {
   ]
 }
 
-/// Long press alternates, from fcitx5-android `PopupPreset.kt`
-/// (itself based on fcitx5 `longpress.cpp`).
+/// Long press alternates: letters and the period follow Google Pinyin, the rest
+/// fcitx5-android `PopupPreset.kt` (itself based on fcitx5 `longpress.cpp`).
 let popupPreset: [String: [String]] = [
-  // Latin
-  "q": ["1", "Q"],
-  "w": ["2", "W"],
-  "e": ["3", "E", "ê", "ë", "ē", "é", "ě", "è", "ė", "ę", "ȩ", "ḝ", "ə"],
-  "r": ["4", "R"],
-  "t": ["5", "T"],
-  "y": ["6", "Y", "ÿ", "ұ", "ү", "ӯ", "ў"],
-  "u": ["7", "U", "û", "ü", "ū", "ú", "ǔ", "ù"],
-  "i": ["8", "I", "î", "ï", "ī", "í", "ǐ", "ì", "į", "ı"],
-  "o": ["9", "O", "ô", "ö", "ō", "ó", "ǒ", "ò", "œ", "ø", "õ"],
-  "p": ["0", "P"],
-  "a": ["@", "A", "â", "ä", "ā", "á", "ǎ", "à", "æ", "ã", "å"],
-  "s": ["*", "S", "ß", "ś", "š", "ş"],
-  "d": ["+", "D", "ð"],
-  "f": ["-", "F"],
-  "g": ["=", "G", "ğ"],
-  "h": ["/", "H"],
-  "j": ["#", "J"],
-  "k": ["(", "[", "{", "K"],
-  "l": [")", "]", "}", "L", "ł"],
-  "z": ["'", "Z", "`", "ž", "ź", "ż"],
-  "x": [":", "X", "×"],
-  "c": ["\"", "C", "ç", "ć", "č"],
-  "v": ["?", "V", "¿", "ü", "ǖ", "ǘ", "ǚ", "ǜ"],
-  "b": ["!", "B", "¡"],
-  "n": ["~", "N", "ñ", "ń"],
-  "m": ["\\", "M"],
-  // Upper case Latin
+  // Google Pinyin long press: slide-down symbol, lower case, upper case, tones.
+  "q": ["1", "q", "Q"],
+  "w": ["2", "w", "W"],
+  "e": ["3", "e", "E", "ê", "ē", "é", "ě", "è"],
+  "r": ["4", "r", "R"],
+  "t": ["5", "t", "T"],
+  "y": ["6", "y", "Y"],
+  "u": ["7", "u", "U", "ū", "ú", "ǔ", "ù"],
+  "i": ["8", "i", "I", "ī", "í", "ǐ", "ì"],
+  "o": ["9", "o", "O", "ō", "ó", "ǒ", "ò"],
+  "p": ["0", "p", "P"],
+  "a": ["@", "a", "A", "ā", "á", "ǎ", "à"],
+  "s": ["*", "s", "S"],
+  "d": ["+", "d", "D"],
+  "f": ["-", "f", "F"],
+  "g": ["=", "g", "G"],
+  "h": ["/", "h", "H"],
+  "j": ["#", "j", "J"],
+  "k": ["（", "k", "K"],
+  "l": ["）", "l", "L"],
+  "z": ["、", "z", "Z"],
+  "x": ["：", "x", "X"],
+  "c": ["\"", "c", "C"],
+  "v": ["？", "v", "V", "ü", "ǖ", "ǘ", "ǚ", "ǜ"],
+  "b": ["！", "b", "B"],
+  "n": ["～", "n", "N"],
+  "m": [".", "m", "M"],
+  // Upper case: symbol and lower case.
   "Q": ["1", "q"],
   "W": ["2", "w"],
-  "E": ["3", "e", "Ê", "Ë", "Ē", "É", "È", "Ė", "Ę", "Ȩ", "Ḝ", "Ə"],
+  "E": ["3", "e"],
   "R": ["4", "r"],
   "T": ["5", "t"],
-  "Y": ["6", "y", "Ÿ", "Ұ", "Ү", "Ӯ", "Ў"],
-  "U": ["7", "u", "Û", "Ü", "Ù", "Ú", "Ū"],
-  "I": ["8", "i", "Î", "Ï", "Í", "Ī", "Į", "Ì"],
-  "O": ["9", "o", "Ô", "Ö", "Ò", "Ó", "Œ", "Ø", "Ō", "Õ"],
+  "Y": ["6", "y"],
+  "U": ["7", "u"],
+  "I": ["8", "i"],
+  "O": ["9", "o"],
   "P": ["0", "p"],
-  "A": ["@", "a", "Â", "Ä", "Ā", "Á", "À", "Æ", "Ã", "Å"],
-  "S": ["*", "s", "ẞ", "Ś", "Š", "Ş"],
-  "D": ["+", "d", "Ð"],
+  "A": ["@", "a"],
+  "S": ["*", "s"],
+  "D": ["+", "d"],
   "F": ["-", "f"],
-  "G": ["=", "g", "Ğ"],
+  "G": ["=", "g"],
   "H": ["/", "h"],
   "J": ["#", "j"],
-  "K": ["(", "k"],
-  "L": [")", "l", "Ł"],
-  "Z": ["'", "z", "`", "Ž", "Ź", "Ż"],
-  "X": [":", "x"],
-  "C": ["\"", "c", "Ç", "Ć", "Č"],
-  "V": ["?", "v"],
-  "B": ["!", "b", "¡"],
-  "N": ["~", "n", "Ñ", "Ń"],
-  "M": ["\\", "m"],
+  "K": ["（", "k"],
+  "L": ["）", "l"],
+  "Z": ["、", "z"],
+  "X": ["：", "x"],
+  "C": ["\"", "c"],
+  "V": ["？", "v"],
+  "B": ["！", "b"],
+  "N": ["～", "n"],
+  "M": [".", "m"],
   // Numbers
   "0": ["∅", "ⁿ", "⁰"],
   "1": ["¹", "½", "⅓", "¼", "⅕", "⅙", "⅐", "⅛", "⅑", "⅒"],
@@ -204,7 +205,8 @@ let popupPreset: [String: [String]] = [
   "8": ["⁸"],
   "9": ["⁹"],
   // Punctuation
-  ".": [",", "?", "!", ":", ";", "_", "%", "$", "^", "&"],
+  // Google Pinyin period key (softkey_bottom_sentence_zh_popup_punctuation).
+  ".": ["…", "？", "！", "：", "；", "_", "%", "$", "^", "&", ":P", ":D", ":(", ":)", "^_^"],
   "-": ["—", "–", "·"],
   "?": ["¿", "‽"],
   "'": ["‘", "’", "‚", "›", "‹"],

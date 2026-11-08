@@ -316,6 +316,7 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
       keyboardType: textDocumentProxy.keyboardType)
     guard state != inputTraitsState else { return }
     inputTraitsState = state
+    vm.setKeyboardType(state.keyboardType)
     // System forces builtin numpad for .numberPad, .decimalPad, .asciiCapableNumberPad.
     vm.setDisplayMode(
       state.keyboardType == .numbersAndPunctuation ? .numpad : .initial, resetReturnMode: true)
@@ -400,6 +401,7 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
     installHostingController()
 
     vm.setReturnKeyType(textDocumentProxy.returnKeyType)
+    vm.setKeyboardType(textDocumentProxy.keyboardType)
     Task { await vm.refreshClipboard() }
     super.viewWillAppear(animated)
     if appGroupAvailable {
