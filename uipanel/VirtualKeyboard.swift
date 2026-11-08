@@ -13,6 +13,7 @@ public enum DisplayMode {
   case documentInfo
   case symbol
   case numpad
+  case theme
   case syncPending
   case syncRunning
   case syncDone
@@ -248,14 +249,19 @@ public class ViewModel: ObservableObject {
     }
   }
 
-  func setThemeConfig(_ style: ThemeStyle, _ mode: ThemeMode, _ keyBorder: Bool, _ keyRadius: Int) {
+  @Published var keyBorderMode = KeyBorderMode.followThemeStyle
+
+  func setThemeConfig(
+    _ style: ThemeStyle, _ mode: ThemeMode, _ keyBorderMode: KeyBorderMode, _ keyRadius: Int
+  ) {
     if themeStyle != style || keyRadiusSetting != keyRadius {
       themeStyle = style
       keyRadiusSetting = keyRadius
       themeRevision += 1
     }
     themeMode = mode
-    self.keyBorder = keyBorder
+    self.keyBorderMode = keyBorderMode
+    keyBorder = keyBorderMode.resolve(style)
   }
 
   func setKeyboardHeightMode(_ mode: KeyboardHeightMode) {
@@ -591,6 +597,8 @@ public struct VirtualKeyboardView: View {
               ClipboardView(width: width)
             } else if viewModel.mode == .symbol {
               SymbolView(width: width)
+            } else if viewModel.mode == .theme {
+              ThemePanelView(width: width)
             } else if viewModel.mode == .numpad {
               NumpadView(width: width)
             }

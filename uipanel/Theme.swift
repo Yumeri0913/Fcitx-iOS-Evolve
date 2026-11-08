@@ -165,6 +165,21 @@ enum ThemeStyle: Int {
   case googlePinyin = 1
 }
 
+// Same values and order as the uipanel addon's KeyBorder option.
+enum KeyBorderMode: Int {
+  case followThemeStyle = 0
+  case on = 1
+  case off = 2
+
+  func resolve(_ style: ThemeStyle) -> Bool {
+    switch self {
+    case .followThemeStyle: return style == .ios
+    case .on: return true
+    case .off: return false
+    }
+  }
+}
+
 // Set from the addon config on the main thread before views read them.
 nonisolated(unsafe) var themeStyle = ThemeStyle.ios
 /// User key radius in pt, or negative to use the theme's.

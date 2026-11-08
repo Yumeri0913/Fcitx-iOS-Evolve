@@ -33,12 +33,12 @@ public func scrollAsync(
 }
 
 public func setThemeConfigAsync(
-  _ style: Int32, _ mode: Int32, _ keyBorder: Bool, _ keyRadius: Int32
+  _ style: Int32, _ mode: Int32, _ keyBorder: Int32, _ keyRadius: Int32
 ) {
   DispatchQueue.main.async {
     vm.setThemeConfig(
       ThemeStyle(rawValue: Int(style)) ?? .ios, ThemeMode(rawValue: Int(mode)) ?? .followSystem,
-      keyBorder, Int(keyRadius))
+      KeyBorderMode(rawValue: Int(keyBorder)) ?? .followThemeStyle, Int(keyRadius))
   }
 }
 

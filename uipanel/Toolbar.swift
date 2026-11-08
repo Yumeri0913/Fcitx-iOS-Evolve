@@ -96,6 +96,10 @@ struct ToolbarButtons: View {
         vm.setDisplayMode(.clipboard)
       }
       Spacer(minLength: 0)
+      ToolButton(systemName: "paintpalette") {
+        vm.setDisplayMode(.theme)
+      }
+      Spacer(minLength: 0)
       ToolButton(systemName: "ellipsis") {
         vm.setDisplayMode(.statusArea)
       }

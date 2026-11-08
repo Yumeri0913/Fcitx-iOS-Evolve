@@ -972,6 +972,10 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
     isClipboardMonitoringEnabled()
   }
 
+  public func setAddonConfig(_ uri: String, _ json: String) {
+    Fcitx.setConfig(uri, json)
+  }
+
   public func setClipboardMonitoring(_ enabled: Bool) {
     setClipboardMonitoringEnabled(enabled)
     if enabled && hasFullAccess {

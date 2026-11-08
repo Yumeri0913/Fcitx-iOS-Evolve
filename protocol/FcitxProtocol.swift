@@ -59,6 +59,9 @@ public protocol FcitxProtocol: AnyObject {
   func clipboardMonitoringEnabled() -> Bool
   func setClipboardMonitoring(_ enabled: Bool)
   func hasKeyboardFullAccess() -> Bool
+  /// Save part of an addon config, e.g. fcitx://config/addon/uipanel, given as a JSON
+  /// object of option name to string value.
+  func setAddonConfig(_ uri: String, _ json: String)
 }
 
 extension FcitxProtocol {
