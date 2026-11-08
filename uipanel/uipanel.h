@@ -33,6 +33,11 @@ enum class HeightMode { GooglePinyin, Percent };
 FCITX_CONFIG_ENUM_NAME_WITH_I18N(HeightMode, N_("Same as Google Pinyin"),
                                  N_("Percentage of screen height"));
 
+// Google Pinyin 滑动输入的敏感度: scales the swipe distance.
+enum class SlideSensitivity { Low, MediumLow, Normal, MediumHigh, High };
+FCITX_CONFIG_ENUM_NAME_WITH_I18N(SlideSensitivity, N_("Low"), N_("Medium low"),
+                                 N_("Normal"), N_("Medium high"), N_("High"));
+
 enum class VibrationStrength { Weak, Medium, Strong };
 FCITX_CONFIG_ENUM_NAME_WITH_I18N(VibrationStrength, N_("Weak"), N_("Medium"),
                                  N_("Strong"));
@@ -56,6 +61,19 @@ FCITX_CONFIGURATION(
                      "Pinyin.")}};
     OptionWithAnnotation<HeightMode, HeightModeI18NAnnotation> heightMode{
         this, "HeightMode", _("Keyboard height"), HeightMode::GooglePinyin};
+    Option<int, IntConstrain> heightRatio{this, "HeightRatio",
+                                          _("Keyboard height ratio (%)"), 100,
+                                          IntConstrain(90, 110)};
+    Option<bool> doubleSpacePeriod{this, "DoubleSpacePeriod",
+                                   _("Double space inserts a period"), true};
+    OptionWithAnnotation<SlideSensitivity, SlideSensitivityI18NAnnotation>
+        slideSensitivity{this, "SlideSensitivity", _("Swipe input sensitivity"),
+                         SlideSensitivity::Normal};
+    Option<int, IntConstrain> longPressDelay{this, "LongPressDelay",
+                                             _("Long press delay (ms)"), 300,
+                                             IntConstrain(100, 1000)};
+    Option<bool> keyPopup{this, "KeyPopup", _("Show key preview on keypress"),
+                          true};
     Option<bool> touchCorrection{this, "TouchCorrection",
                                  _("Touch-aware smart correction"), true};
     Option<bool> vibrate{this, "Vibrate", _("Vibrate on keypress"), true};

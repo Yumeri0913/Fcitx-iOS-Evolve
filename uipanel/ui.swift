@@ -9,8 +9,10 @@ let columnGap: CGFloat = 6  // key_horizontal_margin 3 dp
 // Google Pinyin 4.5.2: 10 dp gap below each key in portrait, 4 dp in landscape.
 let rowGapPortrait: CGFloat = 10
 let rowGapLandscape: CGFloat = 4
-/// Google Pinyin keyboard body top padding.
-let keyboardTopPadding: CGFloat = 6
+/// Gap between the candidate bar and the top row (Google Pinyin has 6 dp). Only its upper
+/// part selects candidates; the rest is neutral so neither side steals the other's taps.
+let keyboardTopPadding: CGFloat = 10
+let candidateTouchZone: CGFloat = 4
 
 // KeyDef text sizes.
 let keyLabelFontSize: CGFloat = 23

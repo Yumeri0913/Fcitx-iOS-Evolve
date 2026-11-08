@@ -186,6 +186,14 @@ nonisolated(unsafe) var themeStyle = ThemeStyle.ios
 nonisolated(unsafe) var keyRadiusSetting = -1
 /// Google Pinyin's 智能更正: send touch alternatives with letter presses.
 nonisolated(unsafe) var touchCorrectionEnabled = true
+// Google Pinyin keyboard settings, see uipanel.h.
+nonisolated(unsafe) var doubleSpacePeriodEnabled = true
+nonisolated(unsafe) var keyPopupEnabled = true
+nonisolated(unsafe) var longPressDelaySetting: TimeInterval = 0.3
+/// Swipe distance ratio: 3.0 (low) .. 0.5 (high sensitivity).
+nonisolated(unsafe) var slideDistanceRatio: CGFloat = 1
+/// Google Pinyin height ratio, 0.9 ... 1.1.
+nonisolated(unsafe) var heightRatioSetting: CGFloat = 1
 
 // Google Pinyin skins: light, dark, or follow the system appearance.
 // Matches the `Theme` option of the uipanel addon config.

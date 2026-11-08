@@ -276,6 +276,13 @@ public class ViewModel: ObservableObject {
     keyBorder = keyBorderMode.resolve(style)
   }
 
+  func setHeightRatio(_ ratio: CGFloat) {
+    if heightRatioSetting != ratio {
+      heightRatioSetting = ratio
+      totalHeight = getDefaultTotalHeight()
+    }
+  }
+
   func setKeyboardHeightMode(_ mode: KeyboardHeightMode) {
     if keyboardHeightMode != mode {
       keyboardHeightMode = mode

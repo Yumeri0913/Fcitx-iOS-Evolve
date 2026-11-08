@@ -66,7 +66,7 @@ private func numPad(
 }
 
 enum KeyboardLayouts {
-  // TextKeyboard.Layout with Google Pinyin 4.5.2's slide-down symbols
+  // TextKeyboard.Layout with Google Pinyin 4.5.2's key symbols (typed by swiping up)
   // (softkeys_input_zh_pinyin_qwerty.xml).
   static let text: [[KeyDef]] = [
     [
@@ -140,7 +140,7 @@ enum KeyboardLayouts {
 /// Long press alternates: letters and the period follow Google Pinyin, the rest
 /// fcitx5-android `PopupPreset.kt` (itself based on fcitx5 `longpress.cpp`).
 let popupPreset: [String: [String]] = [
-  // Google Pinyin long press: slide-down symbol, lower case, upper case, tones.
+  // Google Pinyin long press: key symbol, lower case, upper case, tones.
   "q": ["1", "q", "Q"],
   "w": ["2", "w", "W"],
   "e": ["3", "e", "E", "ê", "ē", "é", "ě", "è"],

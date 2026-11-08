@@ -48,6 +48,19 @@ public func setKeyboardHeightModeAsync(_ mode: Int32) {
   }
 }
 
+public func setTypingConfigAsync(
+  _ heightRatio: Int32, _ doubleSpacePeriod: Bool, _ slideSensitivity: Int32,
+  _ longPressDelay: Int32, _ keyPopup: Bool
+) {
+  DispatchQueue.main.async {
+    doubleSpacePeriodEnabled = doubleSpacePeriod
+    keyPopupEnabled = keyPopup
+    longPressDelaySetting = TimeInterval(longPressDelay) / 1000
+    slideDistanceRatio = [3.0, 1.5, 1.0, 0.8, 0.5][Int(min(max(slideSensitivity, 0), 4))]
+    vm.setHeightRatio(CGFloat(heightRatio) / 100)
+  }
+}
+
 public func setTouchCorrectionAsync(_ enabled: Bool) {
   DispatchQueue.main.async {
     touchCorrectionEnabled = enabled

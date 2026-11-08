@@ -94,7 +94,7 @@ extension View {
     swipeUpLabel: String? = nil,
     longPressItems: [BubbleItem]? = nil, longPressIndex: Int? = nil,
     bubbleFontSize: CGFloat? = nil, disable: Bool = false,
-    longPressDelay: TimeInterval = 0.3, hitLeading: CGFloat = 0, hitTrailing: CGFloat = 0
+    longPressDelay: TimeInterval? = nil, hitLeading: CGFloat = 0, hitTrailing: CGFloat = 0
   ) -> some View {
     let theme = currentTheme(colorScheme)
     return keyProperties(
@@ -112,8 +112,8 @@ extension View {
   }
 }
 
-/// fcitx5-android `AlphabetKey` with Google Pinyin's gestures: swipe down inputs the
-/// symbol printed on the key, swipe up commits the letter itself, long press shows
+/// fcitx5-android `AlphabetKey` with Google Pinyin style gestures: swipe up inputs the
+/// symbol printed on the key, swipe down commits the letter itself, long press shows
 /// `popupPreset` alternates.
 struct AlphabetKeyView: View {
   @ObservedObject private var viewModel = vm
@@ -148,7 +148,7 @@ struct AlphabetKeyView: View {
     let theme = currentTheme(colorScheme)
     let letter = displayLetter
     let alt = symbol
-    // The first long press item is the slide-down symbol.
+    // The first long press item is the key symbol.
     let alternates = [alt] + (popupPreset[letter] ?? []).dropFirst()
     let items = alternates.map { BubbleItem.text($0) }
     let fontSize = getKeyLabelFontSize(height)
@@ -188,7 +188,7 @@ struct AlphabetKeyView: View {
           }
         },
         onSlideOff: { start, end in
-          // Letters never leave vertically: up types the letter, down the symbol (onSwipe).
+          // Letters never leave vertically: up types the symbol, down the letter (onSwipe).
           // A tie counts as horizontal.
           let dx = end.x - start.x
           guard abs(end.y - start.y) <= abs(dx), let geometry,
@@ -217,10 +217,10 @@ struct AlphabetKeyView: View {
         },
         onSwipe: { direction in
           switch direction {
-          case .down:
+          case .up:
             vm.resetLayerIfNotLocked()
             typeKey(alt, "")
-          case .up:
+          case .down:
             vm.resetLayerIfNotLocked()
             if viewModel.hasPreedit {
               typeKey(letter, "Key\(self.letter.uppercased())")
@@ -233,7 +233,7 @@ struct AlphabetKeyView: View {
           }
         }
       ),
-      bubbleLabel: letter, swipeLabel: alt, swipeUpLabel: letter, longPressItems: items,
+      bubbleLabel: letter, swipeLabel: letter, swipeUpLabel: alt, longPressItems: items,
       longPressIndex: 0, hitLeading: hitLeading, hitTrailing: hitTrailing)
   }
 }
@@ -374,7 +374,7 @@ struct SpaceView: View {
             if forward {
               client.resetInput()
               client.forwardKey(" ", "")
-            } else {
+            } else if !doubleSpacePeriod() {
               typeKey(" ", "")
             }
           },
@@ -396,6 +396,29 @@ struct SpaceView: View {
         )
       )
   }
+}
+
+@MainActor private var lastSpaceTime = Date.distantPast
+
+/// Google Pinyin: two quick spaces after a letter, digit or Chinese character become a
+/// period, 。 in Chinese and ". " in English. Returns true if this space was consumed.
+@MainActor
+func doubleSpacePeriod() -> Bool {
+  let now = Date()
+  let previous = lastSpaceTime
+  lastSpaceTime = now
+  guard doubleSpacePeriodEnabled, !vm.hasPreedit, now.timeIntervalSince(previous) <= 0.3,
+    let before = client.currentDocumentInfo().documentContextBeforeInput, before.count >= 2
+  else { return false }
+  let chars = Array(before.suffix(2))
+  guard chars[1] == " ", let scalar = chars[0].unicodeScalars.first,
+    chars[0].isLetter || chars[0].isNumber
+      || (0x4E00...0x9FFF).contains(scalar.value) || (0x3400...0x4DBF).contains(scalar.value)
+  else { return false }
+  lastSpaceTime = .distantPast
+  client.deleteSurroundingText(-1, 1)
+  client.commitString(vm.englishMode ? ". " : "。")
+  return true
 }
 
 /// fcitx5-android `MiniSpaceKey` on the number keyboard.

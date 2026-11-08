@@ -86,7 +86,7 @@ struct LetterGeometry {
 }
 
 /// The keyboard's top padding: a tap just below the candidate bar is meant for the
-/// candidate above it, not the top row.
+/// candidate above it, not the top row; lower down it does nothing.
 struct CandidateTouchStrip: View {
   let width: CGFloat
 
@@ -95,7 +95,7 @@ struct CandidateTouchStrip: View {
       .frame(width: width, height: keyboardTopPadding)
       .contentShape(Rectangle())
       .onTapGesture { location in
-        if let index = vm.candidateIndex(atX: location.x) {
+        if location.y < candidateTouchZone, let index = vm.candidateIndex(atX: location.x) {
           Haptic.keyPress()
           selectCandidate(vm.inputContext, Int32(index))
         }

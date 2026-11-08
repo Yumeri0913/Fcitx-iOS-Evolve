@@ -134,3 +134,43 @@ msgstr "关"
 #: uipanel/uipanel.h
 msgid "Touch-aware smart correction"
 msgstr "按落点智能纠错"
+
+#: uipanel/uipanel.h
+msgid "Low"
+msgstr "低"
+
+#: uipanel/uipanel.h
+msgid "Medium low"
+msgstr "中等偏低"
+
+#: uipanel/uipanel.h
+msgid "Normal"
+msgstr "正常"
+
+#: uipanel/uipanel.h
+msgid "Medium high"
+msgstr "中等偏高"
+
+#: uipanel/uipanel.h
+msgid "High"
+msgstr "高"
+
+#: uipanel/uipanel.h
+msgid "Keyboard height ratio (%)"
+msgstr "键盘高度比例（%）"
+
+#: uipanel/uipanel.h
+msgid "Double space inserts a period"
+msgstr "双击空格键可插入句号"
+
+#: uipanel/uipanel.h
+msgid "Swipe input sensitivity"
+msgstr "滑动输入的敏感度"
+
+#: uipanel/uipanel.h
+msgid "Long press delay (ms)"
+msgstr "长按按键的延迟时间（毫秒）"
+
+#: uipanel/uipanel.h
+msgid "Show key preview on keypress"
+msgstr "按键时弹出显示字符"

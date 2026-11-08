@@ -73,9 +73,10 @@ func getDefaultTotalHeight() -> CGFloat {
   let state = getKeyboardState()
   if keyboardHeightMode == .googlePinyin && state != .floating {
     let bounds = UIScreen.main.bounds
-    return googlePinyinBodyHeight(
-      smallestScreenWidth: min(bounds.width, bounds.height), landscape: state == .landscape)
-      + barHeight
+    return
+      (googlePinyinBodyHeight(
+        smallestScreenWidth: min(bounds.width, bounds.height), landscape: state == .landscape)
+      * heightRatioSetting).rounded() + barHeight
   }
   switch state {
   case .portrait:

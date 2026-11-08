@@ -47,7 +47,7 @@ struct KeyModifier: ViewModifier {
 
   // Google Pinyin 4.5.2: swipe symbol threshold 16 dp (~2.5 mm), space scrub one
   // character per 8 pt (~2.8 mm) and only 200 ms after touch down.
-  let threshold: CGFloat = 16
+  var threshold: CGFloat { 16 * slideDistanceRatio }
   let stepSize: CGFloat = 18
   let slideDelay: TimeInterval = 0.2
 
@@ -217,10 +217,12 @@ struct KeyModifier: ViewModifier {
     rolloverCommitted = false
     slideSuppressed = action.spaceLike && touchTime.timeIntervalSince(vm.lastTouchUpTime) < 0.15
 
-    vm.setBubble(
-      bubbleX, bubbleY, bubbleWidth, bubbleHeight,
-      popupBackground, colorScheme, popupShadow,
-      bubbleLabel, [], 0, 0, bubbleFontSize)
+    if keyPopupEnabled {
+      vm.setBubble(
+        bubbleX, bubbleY, bubbleWidth, bubbleHeight,
+        popupBackground, colorScheme, popupShadow,
+        bubbleLabel, [], 0, 0, bubbleFontSize)
+    }
 
     vm.flushOrderedKeyPresses()
     vm.commitHeldKeys(except: touchId)
@@ -457,7 +459,7 @@ extension View {
     swipeLabel: String? = nil, swipeUpLabel: String? = nil,
     longPressItems: [BubbleItem]? = nil, longPressIndex: Int? = nil,
     bubbleBackground: Color? = nil, bubbleFontSize: CGFloat? = nil, disable: Bool = false,
-    longPressDelay: TimeInterval = 0.3, hitLeading: CGFloat = 0, hitTrailing: CGFloat = 0
+    longPressDelay: TimeInterval? = nil, hitLeading: CGFloat = 0, hitTrailing: CGFloat = 0
   ) -> some View {
     self.modifier(
       KeyModifier(
@@ -470,7 +472,8 @@ extension View {
         bubbleLabel: bubbleLabel, swipeLabel: swipeLabel, swipeUpLabel: swipeUpLabel,
         longPressItems: longPressItems ?? [],
         longPressIndex: longPressIndex ?? 0,
-        longPressDelay: longPressDelay, hitLeading: hitLeading, hitTrailing: hitTrailing
+        longPressDelay: longPressDelay ?? longPressDelaySetting, hitLeading: hitLeading,
+        hitTrailing: hitTrailing
       )
     )
   }

@@ -201,6 +201,13 @@ struct QuickSettingsView: View {
   var body: some View {
     Form {
       Section {
+        Toggle(
+          "Double space inserts a period", isOn: settings.uipanelBool("DoubleSpacePeriod"))
+      } header: {
+        Text("Input")
+      }
+
+      Section {
         Picker("Pinyin scheme", selection: settings.schemeBinding) {
           ForEach(pinyinSchemes, id: \.value) { scheme in
             Text(NSLocalizedString(scheme.label, comment: "")).tag(scheme.value)
@@ -235,6 +242,7 @@ struct QuickSettingsView: View {
           Text("On").tag("On")
           Text("Off").tag("Off")
         }
+        Toggle("Show key preview on keypress", isOn: settings.uipanelBool("KeyPopup"))
         Toggle("Vibrate on keypress", isOn: settings.uipanelBool("Vibrate"))
         Picker("Vibration strength", selection: settings.uipanelValue("VibrationStrength")) {
           Text("Weak").tag("Weak")
@@ -245,6 +253,26 @@ struct QuickSettingsView: View {
         Picker("Keyboard height", selection: settings.uipanelValue("HeightMode")) {
           Text("Same as Google Pinyin").tag("Same as Google Pinyin")
           Text("Percentage of screen height").tag("Percentage of screen height")
+        }
+        // Google Pinyin's 键盘高度 steps.
+        Picker("Keyboard height ratio", selection: settings.uipanelValue("HeightRatio")) {
+          Text("Low").tag("90")
+          Text("Medium low").tag("95")
+          Text("Normal").tag("100")
+          Text("Medium high").tag("105")
+          Text("High").tag("110")
+        }
+        Picker("Swipe input sensitivity", selection: settings.uipanelValue("SlideSensitivity")) {
+          Text("Low").tag("Low")
+          Text("Medium low").tag("Medium low")
+          Text("Normal").tag("Normal")
+          Text("Medium high").tag("Medium high")
+          Text("High").tag("High")
+        }
+        Picker("Long press delay", selection: settings.uipanelValue("LongPressDelay")) {
+          ForEach(["200", "300", "400", "500", "700"], id: \.self) { ms in
+            Text("\(ms) ms").tag(ms)
+          }
         }
       } header: {
         Text("Keyboard")

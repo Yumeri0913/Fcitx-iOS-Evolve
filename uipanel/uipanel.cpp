@@ -80,6 +80,10 @@ void UIPanel::applyConfig() {
     KeyboardUI::setKeyboardHeightModeAsync(
         static_cast<int>(*config_.heightMode));
     KeyboardUI::setTouchCorrectionAsync(*config_.touchCorrection);
+    KeyboardUI::setTypingConfigAsync(
+        *config_.heightRatio, *config_.doubleSpacePeriod,
+        static_cast<int>(*config_.slideSensitivity), *config_.longPressDelay,
+        *config_.keyPopup);
     KeyboardUI::setVibrationAsync(
         *config_.vibrate ? static_cast<int>(*config_.vibrationStrength) + 1
                          : 0);
