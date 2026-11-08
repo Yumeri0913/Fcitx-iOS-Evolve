@@ -143,8 +143,13 @@ func doSyncConfig(_ keyboard: String) async {
           FCITX_INFO("mkdir \(dir.path)")
         } else {
           let serverHash = item[1]
-          let localHash = checksums[path]
-          if localHash == serverHash {
+          // Also check the file itself: the keyboard may have rewritten it since the
+          // last sync (fcitx saves configs from memory), leaving a stale copy.
+          let localFile = documents.appendingPathComponent(path)
+          if checksums[path] == serverHash
+            && FileManager.default.fileExists(atPath: localFile.path)
+            && md5Hash(localFile) == serverHash
+          {
             FCITX_INFO("skip \(path)")
             newChecksums[path] = serverHash
           } else {
@@ -178,11 +183,12 @@ func doSyncConfig(_ keyboard: String) async {
         continue
       }
       if Task.isCancelled { return }
+      await vm.refreshClipboard()
+      // Apply the downloaded config before anything else runs on the fcitx thread.
+      reload()
       if keyboard == "Chinese" {
         await uploadGooglePinyinWords()
       }
-      await vm.refreshClipboard()
-      reload()
       await reportDone(keyboard)
       Task { @MainActor in
         vm.setDisplayMode(.syncDone)

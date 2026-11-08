@@ -1,5 +1,5 @@
 diff --git a/im/pinyin/pinyin.cpp b/im/pinyin/pinyin.cpp
-index 7047c16..fb244a5 100644
+index 7047c16..000ed9b 100644
 --- a/im/pinyin/pinyin.cpp
 +++ b/im/pinyin/pinyin.cpp
 @@ -6,6 +6,8 @@
@@ -49,10 +49,14 @@ index 7047c16..fb244a5 100644
  
      ime_->setScoreFilter(1);
      loadBuiltInDict();
-@@ -2413,6 +2386,10 @@ void PinyinEngine::setSubConfig(const std::string &path,
+@@ -2413,6 +2386,14 @@ void PinyinEngine::setSubConfig(const std::string &path,
          ime_->model()->history().clear();
      } else if (path == "customphrase") {
          loadCustomPhrase();
++    } else if (path == "saveuserdata") {
++        // fcitx5-ios: save learned words without writing conf/pinyin.conf,
++        // which the main app may have changed since the keyboard loaded it.
++        saveUserData();
 +    } else if (path == "reloaduserdata") {
 +        // fcitx5-ios: user.dict and user.history were changed on disk, e.g.
 +        // Google Pinyin words merged in.
@@ -60,7 +64,7 @@ index 7047c16..fb244a5 100644
      }
  }
  
-@@ -2439,8 +2416,49 @@ void PinyinEngine::doReset(InputContext *inputContext) const {
+@@ -2439,8 +2420,53 @@ void PinyinEngine::doReset(InputContext *inputContext) const {
      instance_->resetCompose(inputContext);
  }
  
@@ -100,6 +104,10 @@ index 7047c16..fb244a5 100644
 +
  void PinyinEngine::save() {
      safeSaveAsIni(config_, "conf/pinyin.conf");
++    saveUserData();
++}
++
++void PinyinEngine::saveUserData() {
 +    // fcitx5-ios: user.dict and user.history belong to the keyboard. The main
 +    // app shares the same data directory with App Group, and saving its stale
 +    // copy would overwrite words learned in the keyboard.
@@ -111,14 +119,15 @@ index 7047c16..fb244a5 100644
      standardPath.safeSave(
          StandardPathsType::PkgData, "pinyin/user.dict", [this](int fd) {
 diff --git a/im/pinyin/pinyin.h b/im/pinyin/pinyin.h
-index 3023307..c479a51 100644
+index 3023307..3514a49 100644
 --- a/im/pinyin/pinyin.h
 +++ b/im/pinyin/pinyin.h
-@@ -496,6 +496,7 @@ private:
+@@ -496,6 +496,8 @@ private:
      void loadBuiltInDict();
      void loadExtraDict();
      void loadCustomPhrase();
 +    void loadUserData();
++    void saveUserData();
      void loadSymbols(const UnixFD &file);
      void loadDict(const std::string &fullPath,
                    std::list<std::unique_ptr<TaskToken>> &taskTokens);

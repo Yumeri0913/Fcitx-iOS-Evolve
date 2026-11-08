@@ -71,6 +71,14 @@ bool exportWords(const std::string &dir, const char *tsvOut) {
     }
 }
 
+// Only user.dict and user.history. Instance::save() would also write every
+// addon config from memory, overwriting config just synced from the main app.
+void savePinyinUserData() {
+    if (auto *pinyin = instance->addonManager().addon("pinyin")) {
+        pinyin->setSubConfig("saveuserdata", fcitx::RawConfig{});
+    }
+}
+
 std::string runtimePinyinDir() {
     return fcitx::StandardPaths::global().userDirectory(
                fcitx::StandardPathsType::PkgData) /
@@ -89,7 +97,7 @@ bool exportGooglePinyinWords(const char *dataHome, const char *tsvOut) {
 }
 
 void saveUserData() {
-    dispatcher->schedule([] { instance->save(); });
+    dispatcher->schedule([] { savePinyinUserData(); });
 }
 
 GooglePinyinMergeResult importGooglePinyinWordsLive(const char *tsvPath) {
@@ -97,7 +105,7 @@ GooglePinyinMergeResult importGooglePinyinWordsLive(const char *tsvPath) {
     return with_fcitx([path] {
         // Write words learned in memory first, then merge on disk and let the
         // engine read the merged files back.
-        instance->save();
+        savePinyinUserData();
         auto result = merge(path.c_str(), runtimePinyinDir());
         if (result.ok) {
             if (auto *pinyin = instance->addonManager().addon("pinyin")) {
@@ -114,7 +122,7 @@ GooglePinyinMergeResult importGooglePinyinWordsLive(const char *tsvPath) {
 bool snapshotGooglePinyinWords(const char *tsvOut) {
     std::string out = tsvOut;
     return with_fcitx([out] {
-        instance->save();
+        savePinyinUserData();
         return exportWords(runtimePinyinDir(), out.c_str());
     });
 }
