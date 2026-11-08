@@ -97,8 +97,11 @@ enum GooglePinyinImport {
     return apply(
       { mergeGooglePinyinWords($0.path, appGroupData.path) },
       clear: {
-        let dict = appGroupData.appendingPathComponent("pinyin/user.dict")
-        return !FileManager.default.fileExists(atPath: dict.path) || removeFile(dict)
+        // English words committed with Return are learned words too.
+        ["pinyin/user.dict", "pinyin/user.english"].allSatisfy {
+          let file = appGroupData.appendingPathComponent($0)
+          return !FileManager.default.fileExists(atPath: file.path) || removeFile(file)
+        }
       })
   }
 

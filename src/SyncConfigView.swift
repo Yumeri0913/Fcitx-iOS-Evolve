@@ -101,7 +101,11 @@ final class ServerManager: Sendable {
       for subdir in ["data", "table", "inputmethod", "punctuation"] {
         enumerate("data/\(subdir)")
       }
-      enumerate("data/pinyin", exclude: ["data/pinyin/user.dict", "data/pinyin/user.history"])
+      enumerate(
+        "data/pinyin",
+        exclude: [
+          "data/pinyin/user.dict", "data/pinyin/user.history", "data/pinyin/user.english",
+        ])
       // Pending Google Pinyin imports; the keyboard records which ones it applied.
       enumerate("data/googlepinyin")
     } else if keyboard == "Rime" {

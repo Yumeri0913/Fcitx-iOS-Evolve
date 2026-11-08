@@ -5,7 +5,7 @@ import UIKit
 
 // Pinyin user data belongs to the keyboard. A copy in Documents (e.g. from an old backup)
 // must not overwrite words the keyboard learned, same as /list excludes them.
-private let keyboardUserData = ["user.dict", "user.history"].map {
+private let keyboardUserData = ["user.dict", "user.history", "user.english"].map {
   (documents.appendingPathComponent("data/pinyin/\($0)").path as NSString).standardizingPath
 }
 
