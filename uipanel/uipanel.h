@@ -17,7 +17,12 @@ namespace fcitx {
 enum class ThemeStyle { IOS, GooglePinyin };
 FCITX_CONFIG_ENUM_NAME_WITH_I18N(ThemeStyle, N_("iOS"), N_("Google Pinyin"));
 
-// Light / dark palette and key border.
+// Key tiles: iOS draws them, Google Pinyin's default skin doesn't.
+enum class KeyBorderMode { FollowThemeStyle, On, Off };
+FCITX_CONFIG_ENUM_NAME_WITH_I18N(KeyBorderMode, N_("Follow theme style"),
+                                 N_("On"), N_("Off"));
+
+// Light / dark palette.
 enum class ThemeMode { FollowSystem, Light, Dark };
 FCITX_CONFIG_ENUM_NAME_WITH_I18N(ThemeMode, N_("Follow system"), N_("Light"),
                                  N_("Dark"));
@@ -38,8 +43,8 @@ FCITX_CONFIGURATION(
         this, "ThemeStyle", _("Theme style"), ThemeStyle::IOS};
     OptionWithAnnotation<ThemeMode, ThemeModeI18NAnnotation> theme{
         this, "Theme", _("Theme"), ThemeMode::FollowSystem};
-    Option<bool> keyBorder{this, "KeyBorder", _("Key border (Google Pinyin)"),
-                           false};
+    OptionWithAnnotation<KeyBorderMode, KeyBorderModeI18NAnnotation> keyBorder{
+        this, "KeyBorder", _("Key border"), KeyBorderMode::FollowThemeStyle};
     Option<int, IntConstrain, DefaultMarshaller<int>, ToolTipAnnotation>
         keyRadius{this,
                   "KeyRadius",

@@ -645,8 +645,7 @@ public struct VirtualKeyboardView: View {
       }
       .environment(\.totalHeight, viewModel.totalHeight)
       .id(viewModel.themeRevision)
-      // iOS keys are always tiles; the option is Google Pinyin's.
-      .environment(\.keyBorder, themeStyle == .ios || viewModel.keyBorder)
+      .environment(\.keyBorder, viewModel.keyBorder)
       .environment(\.colorScheme, viewModel.themeMode.resolve(colorScheme))
   }
 

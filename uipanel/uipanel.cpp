@@ -74,9 +74,12 @@ void UIPanel::setConfig(const RawConfig &config) {
 }
 
 void UIPanel::applyConfig() {
+    bool keyBorder = *config_.keyBorder == KeyBorderMode::FollowThemeStyle
+                         ? *config_.themeStyle == ThemeStyle::IOS
+                         : *config_.keyBorder == KeyBorderMode::On;
     KeyboardUI::setThemeConfigAsync(static_cast<int>(*config_.themeStyle),
-                                    static_cast<int>(*config_.theme),
-                                    *config_.keyBorder, *config_.keyRadius);
+                                    static_cast<int>(*config_.theme), keyBorder,
+                                    *config_.keyRadius);
     KeyboardUI::setKeyboardHeightModeAsync(
         static_cast<int>(*config_.heightMode));
     KeyboardUI::setVibrationAsync(
