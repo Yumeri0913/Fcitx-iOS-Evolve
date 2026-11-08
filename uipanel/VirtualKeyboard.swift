@@ -65,6 +65,8 @@ public class ViewModel: ObservableObject {
   @Published var highlighted = -1
   @Published var hasClientPreedit = false
   @Published var batch = 0  // Tell candidate container to reset state
+  /// Candidate bar items in `keyboardSpace`, for taps that land just below the bar.
+  var candidateFrames = [Int: CGRect]()
   @Published var scrollEnd = false
   @Published var hasPrev = false
   @Published var hasNext = false
@@ -146,6 +148,16 @@ public class ViewModel: ObservableObject {
     if shouldResetInput {
       client.resetInput()
     }
+  }
+
+  /// The candidate bar item above the keyboard x position, if candidates are shown.
+  func candidateIndex(atX x: CGFloat) -> Int? {
+    guard mode == .candidates, !expanded else { return nil }
+    // Item views are reused across updates and only report frame changes, so keep
+    // frames and ignore indices past the current list.
+    return candidateFrames.first {
+      $0.key < candidates.count && $0.value.minX <= x && x < $0.value.maxX
+    }?.key
   }
 
   func popDisplayMode() {
@@ -649,7 +661,8 @@ public struct VirtualKeyboardView: View {
         // Floating has variable width before stable.
         updateSize(newWidth)
       }
-    }.frame(height: viewModel.totalHeight)
+    }.coordinateSpace(name: keyboardSpace)
+      .frame(height: viewModel.totalHeight)
       .overlay {
         if viewModel.showOpenURLFullAccessDialog {
           FullAccessDialogView(

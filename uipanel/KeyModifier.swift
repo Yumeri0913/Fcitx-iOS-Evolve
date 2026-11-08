@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftUtil
+import UIPanel
 
 struct GestureAction {
   var onOrderedKeyPress: (() -> (() -> Void))? = nil
@@ -165,6 +166,16 @@ struct KeyModifier: ViewModifier {
       return
     }
     isTouchStarted = true
+    // A tap just below the candidate bar is meant for the candidate above it, not the
+    // top row key: the top row's touch area starts with its vertical margin.
+    if y == 0, location.y < rowGap / 2 + candidateTouchSlop,
+      let index = vm.candidateIndex(atX: x - hitLeading + location.x)
+    {
+      isTouchAccepted = false
+      Haptic.keyPress()
+      selectCandidate(vm.inputContext, Int32(index))
+      return
+    }
     if disable {
       isTouchAccepted = false
       return

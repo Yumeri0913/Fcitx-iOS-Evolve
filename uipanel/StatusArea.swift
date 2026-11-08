@@ -102,6 +102,19 @@ struct StatusAreaView: View {
             }
           }
           Button {
+            vm.setDisplayMode(.theme)
+          } label: {
+            VStack {
+              ZStack {
+                Circle().fill(Color.gray).frame(
+                  width: circleDiameter, height: circleDiameter)
+                Image(systemName: "paintpalette").resizable().scaledToFit().frame(width: 26)
+                  .foregroundColor(.white)
+              }
+              Text("Theme").foregroundColor(.primary)
+            }
+          }.accessibilityIdentifier("Theme")
+          Button {
             vm.showDocumentInfo()
           } label: {
             VStack {

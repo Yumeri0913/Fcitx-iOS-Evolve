@@ -36,3 +36,8 @@ let candidateGap: CGFloat = 0
 let transparent = Color.black.opacity(0.001)
 
 let disabledForeground = Color.gray
+
+/// Name of the keyboard root coordinate space.
+let keyboardSpace = "fcitxKeyboard"
+/// How far below the key margin a top row touch still selects the candidate above.
+let candidateTouchSlop: CGFloat = 5

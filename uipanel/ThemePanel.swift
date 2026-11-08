@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Quick theme switcher opened from the toolbar palette button. Writes the uipanel
+/// Quick theme switcher opened from the status area (more) panel. Writes the uipanel
 /// addon config, which saves it and applies it to the keyboard right away.
 struct ThemePanelView: View {
   @Environment(\.colorScheme) var colorScheme

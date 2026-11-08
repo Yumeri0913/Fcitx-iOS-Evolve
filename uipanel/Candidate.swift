@@ -19,6 +19,8 @@ struct CandidateView: View {
   let index: Int
   let highlighted: Int
   var fontSize: CGFloat = candidateFontSize
+  /// Bar items report their frames so that taps just below the bar select them.
+  var reportsFrame = false
   @State private var isPressed = false
 
   var body: some View {
@@ -30,6 +32,22 @@ struct CandidateView: View {
       .frame(maxHeight: .infinity)
       .background(index == highlighted || isPressed ? theme.keyPressHighlightColor : .clear)
       .cornerRadius(keyCornerRadius)
+      // The whole cell is tappable, not only the text, like fcitx5-android's item views.
+      .contentShape(Rectangle())
+      .background {
+        if reportsFrame {
+          GeometryReader { geometry in
+            let frame = geometry.frame(in: .named(keyboardSpace))
+            // No removal on disappear: an update recreates the items and the old ones
+            // disappear after the new ones appeared. Scrolled away items keep their
+            // last, off screen frames.
+            Color.clear
+              .onAppear { vm.candidateFrames[index] = frame }
+              .onChange(of: frame) { vm.candidateFrames[index] = $0 }
+
+          }
+        }
+      }
       .onTapGesture {
         Haptic.keyPress()
         selectCandidate(inputContext, Int32(index))

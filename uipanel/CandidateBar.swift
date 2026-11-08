@@ -165,7 +165,7 @@ struct CandidateBarView: View {
                 ForEach(Array(candidates.enumerated()), id: \.offset) { index, candidate in
                   CandidateView(
                     text: candidate, inputContext: inputContext, index: index,
-                    highlighted: highlighted, fontSize: fontSize
+                    highlighted: highlighted, fontSize: fontSize, reportsFrame: true
                   ).onAppear {
                     if pendingScroll >= 0 && !scrollEnd
                       && index == candidates.count - candidateCountInRow
