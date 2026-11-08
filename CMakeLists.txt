@@ -25,7 +25,10 @@ execute_process(
     COMMAND_ERROR_IS_FATAL ANY
 )
 
-set(BUNDLE_IDENTIFIER "org.fcitx.Fcitx5")
+# Override both to sign with another team, e.g.
+# -DBUNDLE_IDENTIFIER=com.example.fcitx5 -DAPP_GROUP_IDENTIFIER=group.com.example.fcitx5
+set(BUNDLE_IDENTIFIER "org.fcitx.Fcitx5" CACHE STRING "App bundle ID; keyboards append .<keyboard>")
+set(APP_GROUP_IDENTIFIER "group.org.fcitx.Fcitx5" CACHE STRING "App Group shared by app and keyboards")
 set(BUNDLE_NAME "Fcitx5")
 
 list(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")

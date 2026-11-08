@@ -6,6 +6,8 @@
   <string>@BUNDLE_IDENTIFIER@.@keyboard@</string>
   <key>CFBundleName</key>
   <string>@keyboard@</string>
+  <key>FcitxAppGroup</key>
+  <string>@APP_GROUP_IDENTIFIER@</string>
   <key>CFBundleDisplayName</key>
   <string>@keyboard@</string>
   <key>CFBundleVersion</key>

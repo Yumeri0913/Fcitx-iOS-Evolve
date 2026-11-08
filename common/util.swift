@@ -4,11 +4,14 @@ import Foundation
 private let useAppGroup = true  // On simulator, turn this off to mock side load on real device.
 
 public let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+// APP_GROUP_IDENTIFIER of the build, so that builds signed by another team can use their own.
+private let appGroupIdentifier =
+  Bundle.main.object(forInfoDictionaryKey: "FcitxAppGroup") as? String ?? "group.org.fcitx.Fcitx5"
 // For SideStore, app group is not available, so fallback to documents.
 public let appGroup =
   useAppGroup
   ? (FileManager.default.containerURL(
-    forSecurityApplicationGroupIdentifier: "group.org.fcitx.Fcitx5") ?? documents) : documents
+    forSecurityApplicationGroupIdentifier: appGroupIdentifier) ?? documents) : documents
 public let appGroupConfig = appGroup.appendingPathComponent("config")
 public let appGroupTmp = appGroup.appendingPathComponent("tmp")
 public let appGroupData = appGroup.appendingPathComponent("data")
