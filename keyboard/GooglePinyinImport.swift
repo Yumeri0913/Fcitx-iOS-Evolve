@@ -33,7 +33,7 @@ enum GooglePinyinImport {
     }
   }
 
-  /// import-<UUID>.tsv files not applied yet, oldest first.
+  /// import-<UUID>.tsv and clear-<UUID>.flag files not applied yet, oldest first.
   private static func pendingFiles() -> [URL] {
     let applied = loadApplied()
     let files =
@@ -42,7 +42,8 @@ enum GooglePinyinImport {
     return
       files
       .filter {
-        $0.lastPathComponent.hasPrefix("import-") && $0.pathExtension == "tsv"
+        (($0.lastPathComponent.hasPrefix("import-") && $0.pathExtension == "tsv")
+          || ($0.lastPathComponent.hasPrefix("clear-") && $0.pathExtension == "flag"))
           && !applied.contains($0.lastPathComponent)
       }
       .sorted {
@@ -55,13 +56,26 @@ enum GooglePinyinImport {
   // viewWillAppear and Sync config may both find the same pending file.
   private static let lock = NSLock()
 
-  private static func apply(_ merge: (URL) -> GooglePinyinMergeResult) -> (Int, Int)? {
+  private static func isClear(_ file: URL) -> Bool {
+    file.lastPathComponent.hasPrefix("clear-")
+  }
+
+  private static func apply(
+    _ merge: (URL) -> GooglePinyinMergeResult, clear: () -> Bool
+  ) -> (Int, Int)? {
     lock.lock()
     defer { lock.unlock() }
     var added = 0
     var existing = 0
     var appliedAny = false
     for file in pendingFiles() {
+      if isClear(file) {
+        if clear() {
+          FCITX_INFO("Cleared pinyin user dictionary")
+          markApplied(file)
+        }
+        continue
+      }
       let result = merge(file)
       if result.ok {
         FCITX_INFO(
@@ -80,7 +94,12 @@ enum GooglePinyinImport {
 
   /// Before startKeyboardFcitx: the engine hasn't read the files yet.
   static func applyBeforeStart() -> (Int, Int)? {
-    return apply { mergeGooglePinyinWords($0.path, appGroupData.path) }
+    return apply(
+      { mergeGooglePinyinWords($0.path, appGroupData.path) },
+      clear: {
+        let dict = appGroupData.appendingPathComponent("pinyin/user.dict")
+        return !FileManager.default.fileExists(atPath: dict.path) || removeFile(dict)
+      })
   }
 
   /// With fcitx running: save, merge, then reload the engine's user data.
@@ -88,7 +107,7 @@ enum GooglePinyinImport {
     if pendingFiles().isEmpty {
       return nil
     }
-    return apply { importGooglePinyinWordsLive($0.path) }
+    return apply({ importGooglePinyinWordsLive($0.path) }, clear: { clearPinyinUserDictLive() })
   }
 
   @MainActor

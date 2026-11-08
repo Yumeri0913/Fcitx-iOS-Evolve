@@ -1,4 +1,5 @@
 import Fcitx
+import FcitxIpc
 import Foundation
 import SwiftUtil
 
@@ -50,6 +51,17 @@ extension GooglePinyinUserDict {
       "import-\(UUID().uuidString).tsv")
     try toTsv(parsed.entries).write(to: file, atomically: true, encoding: .utf8)
     return parsed
+  }
+
+  /// User data belongs to the keyboard, so ask it to clear the words it learned.
+  static func requestClear() {
+    mkdirP(googlePinyinImportDirectory.path)
+    let file = googlePinyinImportDirectory.appendingPathComponent(
+      "clear-\(UUID().uuidString).flag")
+    FileManager.default.createFile(atPath: file.path, contents: Data())
+    if appGroupAvailable {
+      requestReload()
+    }
   }
 
   /// Hand pinyin user data from a backup (<dataHome>/pinyin/user.dict and user.history)

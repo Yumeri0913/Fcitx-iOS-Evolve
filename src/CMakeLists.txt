@@ -29,6 +29,7 @@ add_executable(${BUNDLE_NAME} MACOSX_BUNDLE
     DatabaseBackup.swift
     GooglePinyinUserDict.swift
     GooglePinyinUserData.swift
+    QuickSettingsView.swift
     ${CONFIG_UI_FILES}
 )
 

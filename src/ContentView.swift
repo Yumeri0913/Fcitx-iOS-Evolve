@@ -91,6 +91,13 @@ struct ContentView: View {
           }
         }
         Section {
+          // Google Pinyin's settings in one place.
+          NavigationLink(destination: QuickSettingsView()) {
+            Text("Quick settings")
+          }
+          .accessibilityIdentifier("Quick settings")
+        }
+        Section {
           ConfigLinkView(
             title: NSLocalizedString("Global Config", comment: ""), uri: globalConfigUri
           )

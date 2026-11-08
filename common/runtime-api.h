@@ -56,3 +56,5 @@ GooglePinyinMergeResult importGooglePinyinWordsLive(const char *tsvPath);
 // Keyboard with fcitx running: save, then export current user words.
 bool snapshotGooglePinyinWords(const char *tsvOut);
 void saveUserData();
+// Keyboard: clear words learned while typing (pinyin user.dict).
+bool clearPinyinUserDictLive();

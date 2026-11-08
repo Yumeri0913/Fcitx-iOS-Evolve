@@ -126,3 +126,15 @@ bool snapshotGooglePinyinWords(const char *tsvOut) {
         return exportWords(runtimePinyinDir(), out.c_str());
     });
 }
+
+bool clearPinyinUserDictLive() {
+    return with_fcitx([] {
+        auto *pinyin = instance->addonManager().addon("pinyin");
+        if (!pinyin) {
+            return false;
+        }
+        pinyin->setSubConfig("clearuserdict", fcitx::RawConfig{});
+        savePinyinUserData();
+        return true;
+    });
+}
