@@ -32,6 +32,25 @@ public func scrollAsync(
   }
 }
 
+public func setThemeConfigAsync(_ mode: Int32, _ keyBorder: Bool) {
+  DispatchQueue.main.async {
+    vm.setThemeConfig(ThemeMode(rawValue: Int(mode)) ?? .followSystem, keyBorder)
+  }
+}
+
+public func setKeyboardHeightModeAsync(_ mode: Int32) {
+  DispatchQueue.main.async {
+    vm.setKeyboardHeightMode(KeyboardHeightMode(rawValue: Int(mode)) ?? .googlePinyin)
+  }
+}
+
+// 0 turns vibration off, 1-3 is light / medium / heavy.
+public func setVibrationAsync(_ strength: Int32) {
+  DispatchQueue.main.async {
+    Haptic.setStrength(VibrationStrength(rawValue: Int(strength)) ?? .off)
+  }
+}
+
 public struct StatusAreaAction: Identifiable, Sendable {
   public let id: Int32
   let desc: String

@@ -10,11 +10,17 @@ private struct ExportedArchive: Identifiable {
   let id = UUID()
 }
 
+// Restored pinyin user data goes through the Google Pinyin merge flow instead of replacing
+// the keyboard's files, see GooglePinyinUserDict.importUserData.
+private let restoredPinyinUserData = FileManager.default.temporaryDirectory
+  .appendingPathComponent("restored-userdata")
+
 private let backupArchive = BackupArchive(
   configDirectory: appGroupConfig,
   dataDirectory: appGroupData,
   databasesDirectory: clipboardDatabases,
-  clipboardStore: clipboardStore)
+  clipboardStore: clipboardStore,
+  pinyinUserDataDirectory: restoredPinyinUserData)
 
 private func archiveFileName(_ date: Date) -> String {
   let formatter = ISO8601DateFormatter()
@@ -31,7 +37,10 @@ private func importArchive(from sourceURL: URL, source: ImportSource) throws {
     }
   }
 
+  try? FileManager.default.removeItem(at: restoredPinyinUserData)
+  defer { try? FileManager.default.removeItem(at: restoredPinyinUserData) }
   try backupArchive.importData(from: sourceURL, source: source)
+  GooglePinyinUserDict.importUserData(restoredPinyinUserData)
 }
 
 struct DataManagerView: View {
@@ -39,6 +48,7 @@ struct DataManagerView: View {
   @State private var importing = false
   @State private var importSource: ImportSource?
   @State private var showImporter = false
+  @State private var importingGooglePinyin = false
   @State private var exportedArchive: ExportedArchive?
   @State private var showToast = false
   @State private var toastMessage = ""
@@ -92,7 +102,113 @@ struct DataManagerView: View {
       return
     }
     importSource = source
+    importingGooglePinyin = false
     showImporter = true
+  }
+
+  private func displayGooglePinyinImporter() {
+    guard !exporting && !importing else {
+      return
+    }
+    importSource = nil
+    importingGooglePinyin = true
+    showImporter = true
+  }
+
+  private func importGooglePinyin(from url: URL) {
+    importing = true
+    importTask = Task.detached(priority: .userInitiated) {
+      do {
+        let result = try GooglePinyinUserDict.importFile(url)
+        await MainActor.run {
+          importing = false
+          if appGroupAvailable {
+            requestReload()
+          }
+          let parsed = String(
+            format: NSLocalizedString("Parsed %d words, skipped %d lines", comment: ""),
+            result.entries.count, result.skipped)
+          let next =
+            appGroupAvailable
+            ? NSLocalizedString("Applied when the keyboard shows next.", comment: "")
+            : NSLocalizedString("Sync config to apply.", comment: "")
+          displayToast(parsed + "\n" + next, icon: "success")
+        }
+      } catch GooglePinyinDictError.noEntry {
+        await MainActor.run {
+          importing = false
+          displayToast(
+            NSLocalizedString("No pinyin words found", comment: ""), icon: "error")
+        }
+      } catch {
+        FCITX_ERROR("Failed to import Google Pinyin user dictionary: \(error)")
+        await MainActor.run {
+          importing = false
+          displayToast(NSLocalizedString("Import failed", comment: ""), icon: "error")
+        }
+      }
+    }
+  }
+
+  private func exportGooglePinyin() {
+    guard !exporting && !importing else {
+      return
+    }
+    // Google Pinyin imports the file by this name.
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+      UUID().uuidString)
+    mkdirP(directory.path)
+    let url = directory.appendingPathComponent(GooglePinyinUserDict.defaultFileName)
+    currentExportURL = url
+    exporting = true
+    exportTask = Task.detached(priority: .userInitiated) {
+      do {
+        let count = try GooglePinyinUserDict.exportFile(to: url)
+        await MainActor.run {
+          exporting = false
+          if count == 0 {
+            displayToast(NSLocalizedString("No pinyin words found", comment: ""), icon: "error")
+          } else {
+            exportedArchive = ExportedArchive(url: url)
+          }
+        }
+      } catch GooglePinyinDictError.noSnapshot {
+        await MainActor.run {
+          exporting = false
+          displayToast(
+            NSLocalizedString("Sync config first to get words from the keyboard.", comment: ""),
+            icon: "error")
+        }
+      } catch {
+        await MainActor.run {
+          exporting = false
+          displayToast(NSLocalizedString("Export failed", comment: ""), icon: "error")
+        }
+      }
+    }
+  }
+
+  private var googlePinyinFooter: String {
+    var text = NSLocalizedString(
+      "Words in user-dictionary.txt exported from Google Pinyin for Android are merged into the words the keyboard learned, and keep learning as you type. Export includes all of them with their usage counts.",
+      comment: "")
+    if !appGroupAvailable {
+      if let date =
+        (try? FileManager.default.attributesOfItem(
+          atPath: GooglePinyinUserDict.keyboardWordsSnapshot.path))?[.modificationDate] as? Date
+      {
+        text +=
+          "\n"
+          + String(
+            format: NSLocalizedString(
+              "Export uses words from the last Sync config at %@.", comment: ""),
+            date.formatted(date: .abbreviated, time: .shortened))
+      } else {
+        text +=
+          "\n" + NSLocalizedString("Sync config first to get words from the keyboard.", comment: "")
+      }
+    }
+    return text
   }
 
   private func importData(from url: URL, source: ImportSource) {
@@ -153,10 +269,45 @@ struct DataManagerView: View {
       } header: {
         Text("Export data to …").textCase(nil)
       }
+
+      Section {
+        Button {
+          displayGooglePinyinImporter()
+        } label: {
+          Text("Import Google Pinyin user dictionary")
+        }
+        .disabled(exporting || importing)
+        Button {
+          exportGooglePinyin()
+        } label: {
+          Text("Export as Google Pinyin user dictionary")
+        }
+        .disabled(exporting || importing)
+      } header: {
+        Text("Google Pinyin").textCase(nil)
+      } footer: {
+        Text(googlePinyinFooter)
+      }
     }
     .navigationTitle(NSLocalizedString("Data Manager", comment: ""))
     .navigationBarTitleDisplayMode(.inline)
-    .fileImporter(isPresented: $showImporter, allowedContentTypes: [.zip]) { result in
+    .fileImporter(
+      isPresented: $showImporter,
+      allowedContentTypes: importingGooglePinyin ? [.plainText, .text, .data] : [.zip]
+    ) { result in
+      if importingGooglePinyin {
+        importingGooglePinyin = false
+        switch result {
+        case .success(let url):
+          importGooglePinyin(from: url)
+        case .failure(let error):
+          if let cocoaError = error as? CocoaError, cocoaError.code == .userCancelled {
+            return
+          }
+          displayToast(NSLocalizedString("Import failed", comment: ""), icon: "error")
+        }
+        return
+      }
       guard let source = importSource else {
         return
       }

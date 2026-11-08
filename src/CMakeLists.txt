@@ -27,6 +27,8 @@ add_executable(${BUNDLE_NAME} MACOSX_BUNDLE
     ActivityView.swift
     BackupArchive.swift
     DatabaseBackup.swift
+    GooglePinyinUserDict.swift
+    GooglePinyinUserData.swift
     ${CONFIG_UI_FILES}
 )
 
@@ -41,8 +43,10 @@ set(ENGINE_TARGETS)
 
 if (CHINESE_ADDONS)
     list(APPEND KEYBOARDS Chinese)
-    list(APPEND DEFAULT_INPUT_METHODS pinyin shuangpin wbx)
-    generate_profile(Chinese "src/Chinese.appex" "pinyin;shuangpin;wbx")
+    # Google Pinyin style: only full pinyin is enabled at first; shuangpin and
+    # wbx stay available in Input Methods.
+    list(APPEND DEFAULT_INPUT_METHODS pinyin)
+    generate_profile(Chinese "src/Chinese.appex" "pinyin")
     fcitx5_get_addon_targets(CHINESE_TARGETS "${ENGINES_SOURCE_DIR}/fcitx5-chinese-addons" "${ENGINES_SOURCE_DIR}/fcitx5-lua")
     add_keyboard_extension(Chinese "zh-Hans" "${CHINESE_TARGETS}")
     list(APPEND ENGINE_TARGETS ${CHINESE_TARGETS})

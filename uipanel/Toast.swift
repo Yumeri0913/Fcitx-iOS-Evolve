@@ -16,7 +16,7 @@ struct ToastView: View {
       Button(action: action) {
         Text(actionTitle)
           .fontWeight(.semibold)
-          .foregroundColor(highlightBackground)
+          .foregroundColor(getAccentBackground(colorScheme))
           .padding(.horizontal, 8)
           .frame(minHeight: 44)
       }
@@ -27,5 +27,27 @@ struct ToastView: View {
     .background(getFunctionBackground(colorScheme).blend(with: getBackground(colorScheme)))
     .cornerRadius(8)
     .shadow(radius: 4)
+  }
+}
+
+/// A message covering the toolbar, dismissed by tap or after a while.
+struct NoticeView: View {
+  @Environment(\.colorScheme) private var colorScheme
+
+  let message: String
+
+  var body: some View {
+    let theme = currentTheme(colorScheme)
+    Text(message)
+      .font(.system(size: 15))
+      .foregroundColor(theme.keyTextColor)
+      .lineLimit(1)
+      .minimumScaleFactor(0.6)
+      .padding(.horizontal, 12)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(theme.keyBackgroundColor)
+      .cornerRadius(8)
+      .shadow(radius: 2)
+      .padding(.vertical, 4)
   }
 }

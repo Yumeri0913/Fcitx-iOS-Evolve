@@ -3,6 +3,16 @@ import FcitxIpc
 import SwiftUtil
 import UIKit
 
+// Pinyin user data belongs to the keyboard. A copy in Documents (e.g. from an old backup)
+// must not overwrite words the keyboard learned, same as /list excludes them.
+private let keyboardUserData = ["user.dict", "user.history"].map {
+  (documents.appendingPathComponent("data/pinyin/\($0)").path as NSString).standardizingPath
+}
+
+private func isKeyboardUserData(_ url: URL) -> Bool {
+  keyboardUserData.contains((url.path as NSString).standardizingPath)
+}
+
 func syncDocumentsToAppGroup() -> Bool {
   guard appGroupAvailable else { return false }
   var changed = false
@@ -10,7 +20,10 @@ func syncDocumentsToAppGroup() -> Bool {
   for directory in ["data", "config"] {
     let source = documents.appendingPathComponent(directory)
     guard FileManager.default.fileExists(atPath: source.path) else { continue }
-    if !sync(source, appGroup.appendingPathComponent(directory), changed: &changed) {
+    if !sync(
+      source, appGroup.appendingPathComponent(directory), changed: &changed,
+      skip: isKeyboardUserData)
+    {
       success = false
       FCITX_ERROR("Failed to sync Documents/\(directory) to App Group")
     }

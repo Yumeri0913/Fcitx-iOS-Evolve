@@ -1,0 +1,199 @@
+import SwiftUI
+
+// Color roles mirror fcitx5-android's `Theme` so presets can be copied verbatim
+// and both keyboards render the same palette.
+struct Theme {
+  let name: String
+  let isDark: Bool
+
+  let backgroundColor: Color
+  let barColor: Color
+  let keyboardColor: Color
+
+  let keyBackgroundColor: Color
+  let keyTextColor: Color
+
+  let candidateTextColor: Color
+  let candidateLabelColor: Color
+  let candidateCommentColor: Color
+
+  let altKeyBackgroundColor: Color
+  let altKeyTextColor: Color
+
+  let accentKeyBackgroundColor: Color
+  let accentKeyTextColor: Color
+
+  let keyPressHighlightColor: Color
+  let keyShadowColor: Color
+
+  let popupBackgroundColor: Color
+  let popupTextColor: Color
+
+  let spaceBarColor: Color
+  let dividerColor: Color
+  let clipboardEntryColor: Color
+
+  let genericActiveBackgroundColor: Color
+  let genericActiveForegroundColor: Color
+
+  init(
+    name: String, isDark: Bool,
+    backgroundColor: UInt32, barColor: UInt32, keyboardColor: UInt32,
+    keyBackgroundColor: UInt32, keyTextColor: UInt32,
+    candidateTextColor: UInt32, candidateLabelColor: UInt32, candidateCommentColor: UInt32,
+    altKeyBackgroundColor: UInt32, altKeyTextColor: UInt32,
+    accentKeyBackgroundColor: UInt32, accentKeyTextColor: UInt32,
+    keyPressHighlightColor: UInt32, keyShadowColor: UInt32,
+    popupBackgroundColor: UInt32, popupTextColor: UInt32,
+    spaceBarColor: UInt32, dividerColor: UInt32, clipboardEntryColor: UInt32,
+    genericActiveBackgroundColor: UInt32, genericActiveForegroundColor: UInt32
+  ) {
+    self.name = name
+    self.isDark = isDark
+    self.backgroundColor = Color(argb: backgroundColor)
+    self.barColor = Color(argb: barColor)
+    self.keyboardColor = Color(argb: keyboardColor)
+    self.keyBackgroundColor = Color(argb: keyBackgroundColor)
+    self.keyTextColor = Color(argb: keyTextColor)
+    self.candidateTextColor = Color(argb: candidateTextColor)
+    self.candidateLabelColor = Color(argb: candidateLabelColor)
+    self.candidateCommentColor = Color(argb: candidateCommentColor)
+    self.altKeyBackgroundColor = Color(argb: altKeyBackgroundColor)
+    self.altKeyTextColor = Color(argb: altKeyTextColor)
+    self.accentKeyBackgroundColor = Color(argb: accentKeyBackgroundColor)
+    self.accentKeyTextColor = Color(argb: accentKeyTextColor)
+    self.keyPressHighlightColor = Color(argb: keyPressHighlightColor)
+    self.keyShadowColor = Color(argb: keyShadowColor)
+    self.popupBackgroundColor = Color(argb: popupBackgroundColor)
+    self.popupTextColor = Color(argb: popupTextColor)
+    self.spaceBarColor = Color(argb: spaceBarColor)
+    self.dividerColor = Color(argb: dividerColor)
+    self.clipboardEntryColor = Color(argb: clipboardEntryColor)
+    self.genericActiveBackgroundColor = Color(argb: genericActiveBackgroundColor)
+    self.genericActiveForegroundColor = Color(argb: genericActiveForegroundColor)
+  }
+}
+
+extension Color {
+  /// 0xAARRGGBB, the literal form used by fcitx5-android's `ThemePreset`.
+  init(argb: UInt32) {
+    let a = Double((argb >> 24) & 0xff) / 255
+    let r = Double((argb >> 16) & 0xff) / 255
+    let g = Double((argb >> 8) & 0xff) / 255
+    let b = Double(argb & 0xff) / 255
+    self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
+  }
+}
+
+// Copied from fcitx5-android (InsightKey fork) ThemePreset.kt.
+enum ThemePreset {
+  // Google Pinyin 4.x default skin "Material Light" with key borders off,
+  // from its style_sheet_material_light.
+  static let googlePinyinLight = Theme(
+    name: "GooglePinyinLight", isDark: false,
+    backgroundColor: 0xffec_eff1, barColor: 0xffe4_e7e9, keyboardColor: 0xffec_eff1,
+    keyBackgroundColor: 0xfffb_fbfc, keyTextColor: 0xff37_474f,
+    candidateTextColor: 0xff37_474f, candidateLabelColor: 0xff37_474f,
+    candidateCommentColor: 0xb337_474f,
+    altKeyBackgroundColor: 0xffdf_e2e4, altKeyTextColor: 0xb337_474f,
+    accentKeyBackgroundColor: 0xff4d_b6ac, accentKeyTextColor: 0xffff_ffff,
+    keyPressHighlightColor: 0x1937_474f, keyShadowColor: 0xffc0_c3c4,
+    popupBackgroundColor: 0xffd9_dbdd, popupTextColor: 0xff37_474f,
+    spaceBarColor: 0x3337_474f, dividerColor: 0x3337_474f, clipboardEntryColor: 0xfffb_fbfc,
+    genericActiveBackgroundColor: 0xff80_cbc4, genericActiveForegroundColor: 0xff37_474f)
+
+  // Google Pinyin 4.x "Material Dark", key borders off.
+  static let googlePinyinDark = Theme(
+    name: "GooglePinyinDark", isDark: true,
+    backgroundColor: 0xff26_3238, barColor: 0xff21_272b, keyboardColor: 0xff26_3238,
+    keyBackgroundColor: 0xff40_4a50, keyTextColor: 0xccff_ffff,
+    candidateTextColor: 0xccff_ffff, candidateLabelColor: 0xccff_ffff,
+    candidateCommentColor: 0x99ff_ffff,
+    altKeyBackgroundColor: 0xff31_3c42, altKeyTextColor: 0x99ff_ffff,
+    accentKeyBackgroundColor: 0xff80_cbc4, accentKeyTextColor: 0xffff_ffff,
+    keyPressHighlightColor: 0x1aff_ffff, keyShadowColor: 0xff1f_292e,
+    popupBackgroundColor: 0xff3c_474c, popupTextColor: 0xffff_ffff,
+    spaceBarColor: 0x1aff_ffff, dividerColor: 0x1aff_ffff, clipboardEntryColor: 0xff40_4a50,
+    genericActiveBackgroundColor: 0xff4d_b6ac, genericActiveForegroundColor: 0xffff_ffff)
+}
+
+// Google Pinyin skins: light, dark, or follow the system appearance.
+// Matches the `Theme` option of the uipanel addon config.
+enum ThemeMode: Int {
+  case followSystem = 0
+  case light = 1
+  case dark = 2
+
+  func resolve(_ system: ColorScheme) -> ColorScheme {
+    switch self {
+    case .followSystem:
+      return system
+    case .light:
+      return .light
+    case .dark:
+      return .dark
+    }
+  }
+}
+
+let lightTheme = ThemePreset.googlePinyinLight
+let darkTheme = ThemePreset.googlePinyinDark
+
+func currentTheme(_ colorScheme: ColorScheme) -> Theme {
+  return colorScheme == .dark ? darkTheme : lightTheme
+}
+
+// Google Pinyin "按键边框": bordered key tiles with a bottom shadow.
+// Off (Google Pinyin's default) draws flat labels on the keyboard background.
+struct KeyBorderKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
+extension EnvironmentValues {
+  var keyBorder: Bool {
+    get { self[KeyBorderKey.self] }
+    set { self[KeyBorderKey.self] = newValue }
+  }
+}
+
+// Convenience accessors kept for views that only need a color role.
+func getBackground(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).backgroundColor
+}
+
+func getNormalBackground(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).keyBackgroundColor
+}
+
+func getFunctionBackground(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).altKeyBackgroundColor
+}
+
+func getNormalForeground(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).keyTextColor
+}
+
+func getAltForeground(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).altKeyTextColor
+}
+
+func getShadow(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).keyShadowColor
+}
+
+func getPressHighlight(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).keyPressHighlightColor
+}
+
+func getHighlightBackground(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).keyPressHighlightColor
+}
+
+func getAccentBackground(_ colorScheme: ColorScheme) -> Color {
+  return currentTheme(colorScheme).accentKeyBackgroundColor
+}
+
+func getDisabledForeground(_ colorScheme: ColorScheme) -> Color {
+  // Android's disabledAlpha.
+  return currentTheme(colorScheme).altKeyTextColor.opacity(0.38)
+}

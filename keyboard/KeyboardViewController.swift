@@ -81,6 +81,7 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
   private var isSlidingBackspace = false
   private var hasMarkedText = false
   static let keyboard = Bundle.main.bundleURL.deletingPathExtension().lastPathComponent
+  private static var coldStartMergeResult: (Int, Int)?
   static private var clipboardText = ""
   static private var firstLoad = true
 
@@ -340,6 +341,10 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
       // app and keyboards are killed, but only if app is started first can it sync
       // locale to keyboards. Need to find a way to update locale on viewWillAppear.
       setLocale(syncLocale())
+      if Self.keyboard == "Chinese" {
+        // Merge pending Google Pinyin words before the pinyin engine reads user data.
+        Self.coldStartMergeResult = GooglePinyinImport.applyBeforeStart()
+      }
       startKeyboardFcitx(appBundlePath, "\(Bundle.main.bundlePath)/share", appGroup.path)
     }
 
@@ -426,8 +431,22 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
       Fcitx.focusIn(program, currentDocumentIdentifier())
       self.resetInput()  // Avoid old context carried over.
       startClipboardMonitoring()
+      processGooglePinyinImports()
     }
     startDocumentPolling()
+  }
+
+  private func processGooglePinyinImports() {
+    guard Self.keyboard == "Chinese" else { return }
+    if let result = Self.coldStartMergeResult {
+      Self.coldStartMergeResult = nil
+      GooglePinyinImport.showResult(result)
+    }
+    // with_fcitx blocks, so don't wait for the fcitx thread on main.
+    Task.detached(priority: .userInitiated) {
+      let result = GooglePinyinImport.applyLive()
+      await MainActor.run { GooglePinyinImport.showResult(result) }
+    }
   }
 
   override func viewWillDisappear(_ animated: Bool) {
@@ -436,6 +455,7 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
     acceptsFcitxCommands = false
     inputTraitsState = nil
     Fcitx.focusOut(program, currentDocumentIdentifier())
+    UserDataSaver.saveIfNeeded()
     stopDocumentPolling()
     stopClipboardMonitoring()
     vm.hideClipboardSuggestion()

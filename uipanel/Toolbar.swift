@@ -1,169 +1,179 @@
 import SwiftUI
 
-struct UndoButton: View {
-  @Environment(\.colorScheme) var colorScheme
-  @Environment(\.totalHeight) var totalHeight
-  @ObservedObject var viewModel = vm
+// The idle bar of fcitx5-android (`IdleUi` / `ButtonsBarUi`): undo, redo, text
+// editing, clipboard and status area spread over the bar, with a hide-keyboard
+// button at the end. The InsightKey fork always shows the toolbar, so there is
+// no expand/collapse button.
 
-  var body: some View {
-    Button {
-      client.undo()
-    } label: {
-      Image(systemName: "arrow.uturn.backward")
-        .foregroundColor(
-          viewModel.canUndo ? getNormalForeground(colorScheme) : disabledForeground
-        )
-        .frame(width: getBarHeight(totalHeight), height: getBarHeight(totalHeight))
-    }.disabled(!viewModel.canUndo)
+struct ToolButtonStyle: ButtonStyle {
+  let highlight: Color
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .background(Circle().fill(configuration.isPressed ? highlight : Color.clear))
   }
 }
 
-struct RedoButton: View {
+/// fcitx5-android `ToolButton`: 40 dp, icon tinted with the alt key text color.
+struct ToolButton: View {
   @Environment(\.colorScheme) var colorScheme
-  @Environment(\.totalHeight) var totalHeight
-  @ObservedObject var viewModel = vm
+
+  let systemName: String
+  var size: CGFloat = toolButtonSize
+  var iconSize: CGFloat = toolButtonIconSize
+  var enabled = true
+  let action: () -> Void
 
   var body: some View {
+    let theme = currentTheme(colorScheme)
     Button {
-      client.redo()
+      Haptic.keyPress()
+      action()
     } label: {
-      Image(systemName: "arrow.uturn.forward")
-        .foregroundColor(
-          viewModel.canRedo ? getNormalForeground(colorScheme) : disabledForeground
-        )
-        .frame(width: getBarHeight(totalHeight), height: getBarHeight(totalHeight))
-    }.disabled(!viewModel.canRedo)
-  }
-}
-
-struct EditorButton: View {
-  @Environment(\.colorScheme) var colorScheme
-  @Environment(\.totalHeight) var totalHeight
-
-  var body: some View {
-    Button {
-      vm.setDisplayMode(.edit)
-    } label: {
-      Image(systemName: "character.cursor.ibeam")
-        .foregroundColor(getNormalForeground(colorScheme))
-        .frame(width: getBarHeight(totalHeight), height: getBarHeight(totalHeight))
+      Image(systemName: systemName)
+        .resizable()
+        .aspectRatio(contentMode: .fit)
+        .frame(width: iconSize, height: iconSize)
+        .foregroundColor(enabled ? theme.altKeyTextColor : getDisabledForeground(colorScheme))
+        .frame(width: size, height: size)
+        .contentShape(Rectangle())
     }
-  }
-}
-
-struct ClipboardButton: View {
-  @Environment(\.colorScheme) var colorScheme
-  @Environment(\.totalHeight) var totalHeight
-
-  var body: some View {
-    Button {
-      vm.setDisplayMode(.clipboard)
-    } label: {
-      Image(systemName: "doc.on.clipboard")
-        .foregroundColor(getNormalForeground(colorScheme))
-        .frame(width: getBarHeight(totalHeight), height: getBarHeight(totalHeight))
-    }
-  }
-}
-
-struct StatusAreaButton: View {
-  @Environment(\.colorScheme) var colorScheme
-  @Environment(\.totalHeight) var totalHeight
-
-  var body: some View {
-    Button {
-      vm.setDisplayMode(.statusArea)
-    } label: {
-      Image(systemName: "ellipsis")
-        .foregroundColor(getNormalForeground(colorScheme))
-        .frame(width: getBarHeight(totalHeight), height: getBarHeight(totalHeight))
-    }
+    .buttonStyle(ToolButtonStyle(highlight: theme.keyPressHighlightColor))
+    .disabled(!enabled)
   }
 }
 
 struct DismissKeyboardButton: View {
-  @Environment(\.colorScheme) var colorScheme
-  @Environment(\.totalHeight) var totalHeight
-
   var body: some View {
-    let barHeight = getBarHeight(totalHeight)
-    Button {
+    ToolButton(systemName: "arrowtriangle.down.fill", iconSize: 12) {
       client.dismissKeyboard()
-    } label: {
-      Image(systemName: "chevron.down").resizable()
-        .foregroundColor(getNormalForeground(colorScheme))
-        .aspectRatio(contentMode: .fit).frame(width: barHeight * expandIconRatio)
-        .frame(width: barHeight * expandButtonRatio, height: barHeight)
     }
   }
 }
 
-struct ToolbarButtons: View {
-  let width: CGFloat
+/// Google Pinyin style 中/英 switch at the start of the toolbar.
+struct LanguageToggleButton: View {
+  @Environment(\.colorScheme) var colorScheme
+  @ObservedObject var viewModel = vm
 
   var body: some View {
-    let itemWidth = width / 7
+    let theme = currentTheme(colorScheme)
+    Button {
+      Haptic.keyPress()
+      vm.toggleEnglishMode()
+    } label: {
+      Text(viewModel.languageLabel)
+        .font(.system(size: 17, weight: .bold))
+        .foregroundColor(theme.altKeyTextColor)
+        .frame(width: toolButtonSize, height: toolButtonSize)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(ToolButtonStyle(highlight: theme.keyPressHighlightColor))
+    .accessibilityLabel(NSLocalizedString("Toggle Chinese/English", comment: ""))
+  }
+}
+
+struct ToolbarButtons: View {
+  @ObservedObject var viewModel = vm
+
+  var body: some View {
     HStack(spacing: 0) {
-      UndoButton().frame(width: itemWidth)
-      RedoButton().frame(width: itemWidth)
-      EditorButton().frame(width: itemWidth)
-      ClipboardButton().frame(width: itemWidth)
-      StatusAreaButton().frame(width: itemWidth)
-      DismissKeyboardButton().frame(width: itemWidth)
-    }.frame(width: itemWidth * 6)
+      LanguageToggleButton()
+      Spacer(minLength: 0)
+      ToolButton(systemName: "arrow.uturn.backward", enabled: viewModel.canUndo) {
+        client.undo()
+      }
+      Spacer(minLength: 0)
+      ToolButton(systemName: "arrow.uturn.forward", enabled: viewModel.canRedo) {
+        client.redo()
+      }
+      Spacer(minLength: 0)
+      ToolButton(systemName: "character.cursor.ibeam") {
+        vm.setDisplayMode(.edit)
+      }
+      Spacer(minLength: 0)
+      ToolButton(systemName: "doc.on.clipboard") {
+        vm.setDisplayMode(.clipboard)
+      }
+      Spacer(minLength: 0)
+      ToolButton(systemName: "ellipsis") {
+        vm.setDisplayMode(.statusArea)
+      }
+      Spacer(minLength: 0)
+    }
+  }
+}
+
+/// fcitx5-android `ClipboardSuggestionUi` with the fork's close button.
+struct ClipboardSuggestionBar: View {
+  @Environment(\.colorScheme) var colorScheme
+  @ObservedObject var viewModel = vm
+
+  let text: String
+
+  var body: some View {
+    let theme = currentTheme(colorScheme)
+    HStack(spacing: 4) {
+      Spacer(minLength: 0)
+      Button {
+        viewModel.pasteClipboardSuggestion()
+      } label: {
+        HStack(spacing: 4) {
+          Image(systemName: "doc.on.clipboard")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 20, height: 20)
+          Text(text)
+            .font(.system(size: 14))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: 160)
+        }
+        .foregroundColor(theme.altKeyTextColor)
+        .padding(.horizontal, 8)
+        .frame(height: barHeight - 8)
+        .background(
+          RoundedRectangle(cornerRadius: 4)
+            .fill(viewModel.showMenu ? Color.clear : Color.clear))
+      }
+      .buttonStyle(ClipboardSuggestionButtonStyle(highlight: theme.keyPressHighlightColor))
+      .accessibilityIdentifier("ClipboardSuggestion")
+      .disabled(viewModel.showMenu)
+      ToolButton(systemName: "xmark", size: 28, iconSize: 14) {
+        viewModel.dismissClipboardSuggestion()
+      }
+      .accessibilityIdentifier("ShowToolbar")
+      Spacer(minLength: 0)
+    }
+  }
+}
+
+struct ClipboardSuggestionButtonStyle: ButtonStyle {
+  let highlight: Color
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .background(
+        RoundedRectangle(cornerRadius: 4).fill(configuration.isPressed ? highlight : Color.clear))
   }
 }
 
 struct ToolbarView: View {
-  @Environment(\.colorScheme) var colorScheme
-  @Environment(\.totalHeight) var totalHeight
   @ObservedObject private var viewModel = vm
   let width: CGFloat
-  var showsBackButton = false
 
   var body: some View {
     HStack(spacing: 0) {
-      if showsBackButton {
-        Button {
-          vm.popDisplayMode()
-        } label: {
-          Image(systemName: "arrow.backward")
-            .foregroundColor(getNormalForeground(colorScheme))
-            .frame(width: width / 7, height: getBarHeight(totalHeight))
-        }
-      } else if viewModel.clipboardSuggestionText != nil {
-        Button {
-          viewModel.dismissClipboardSuggestion()
-        } label: {
-          Image(systemName: "xmark")
-            .foregroundColor(getNormalForeground(colorScheme))
-            .frame(width: width / 7, height: getBarHeight(totalHeight))
-        }
-        .accessibilityIdentifier("ShowToolbar")
-      } else {
-        Spacer().frame(width: width / 7)
-      }
       if let text = viewModel.clipboardSuggestionText {
-        Button {
-          viewModel.pasteClipboardSuggestion()
-        } label: {
-          HStack(spacing: 4) {
-            Image(systemName: "doc.on.clipboard")
-            Text(String(text.prefix(42)))
-              .lineLimit(1)
-              .truncationMode(.tail)
-          }
-          .foregroundColor(getNormalForeground(colorScheme))
-          .padding(.horizontal, 8)
-          .frame(width: width * 5 / 7, height: getBarHeight(totalHeight))
-        }
-        .accessibilityIdentifier("ClipboardSuggestion")
-        .disabled(viewModel.showMenu)
-        DismissKeyboardButton().frame(width: width / 7)
+        ClipboardSuggestionBar(text: text)
+          .frame(width: width - toolButtonSize, height: barHeight)
       } else {
-        ToolbarButtons(width: width)
+        ToolbarButtons()
+          .frame(width: width - toolButtonSize, height: barHeight)
       }
-    }.frame(width: width)
-      .onAppear { viewModel.refreshClipboardSuggestion() }
+      DismissKeyboardButton()
+    }
+    .frame(width: width, height: barHeight)
+    .onAppear { viewModel.refreshClipboardSuggestion() }
   }
 }

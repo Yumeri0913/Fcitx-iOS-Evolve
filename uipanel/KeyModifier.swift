@@ -34,10 +34,10 @@ private func clearBubble() {
 
 struct KeyModifier: ViewModifier {
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.keyBorder) var keyBorder
 
   let threshold: CGFloat = 30
   let stepSize: CGFloat = 15
-  let moveSize: CGFloat = 30
 
   @State private var touchId = 0
   @State private var lastTouchTime: Date?
@@ -62,23 +62,32 @@ struct KeyModifier: ViewModifier {
   let background: Color
   let bubbleBackground: Color?
   let bubbleFontSize: CGFloat?
-  let pressedBackground: Color
   let foreground: Color
-  let pressedForeground: Color
+  let highlight: Color
   let shadow: Color
   let action: GestureAction
   let disable: Bool
   let pressedView: (any View)?
-  let topRight: String?
   let bubbleLabel: String?
-  let swipeUpLabel: String?
-  let swipeUpItem: BubbleItem?
+  let swipeLabel: String?
   let longPressItems: [BubbleItem]
   let longPressIndex: Int
   var bubbleX: CGFloat { x + width / 2 }
   var bubbleY: CGFloat { y + height / 2 }
   var bubbleWidth: CGFloat { width - hMargin }
-  var bubbleHeight: CGFloat { height - rowGap }
+  var bubbleHeight: CGFloat { height - vMargin }
+
+  private var popupBackground: Color {
+    bubbleBackground ?? currentTheme(colorScheme).popupBackgroundColor
+  }
+
+  private var accentBackground: Color {
+    currentTheme(colorScheme).accentKeyBackgroundColor
+  }
+
+  private var popupShadow: Color {
+    currentTheme(colorScheme).keyShadowColor
+  }
 
   private func cancelOrderedKeyPress() {
     if let id = orderedKeyPressId {
@@ -103,6 +112,13 @@ struct KeyModifier: ViewModifier {
     return false
   }
 
+  private func showLongPressBubble() {
+    vm.setBubble(
+      bubbleX, bubbleY, bubbleWidth, bubbleHeight,
+      popupBackground, colorScheme, popupShadow, nil, longPressItems, longPressIndex,
+      bubbleHighlight, bubbleFontSize)
+  }
+
   private func onTimer(_ currentTouchId: Int) {
     if touchId != currentTouchId {
       // Called from a previous touch.
@@ -114,12 +130,9 @@ struct KeyModifier: ViewModifier {
     if isPressed && !didTriggerLongPress && !didMoveFarEnough {
       cancelOrderedKeyPress()
       didTriggerLongPress = true
-      if longPressIndex >= 0 && longPressIndex < longPressItems.count {
-        bubbleHighlight = longPressIndex
-        vm.setBubble(
-          bubbleX, bubbleY, bubbleWidth, bubbleHeight,
-          bubbleBackground ?? background, colorScheme, shadow, nil, longPressItems, longPressIndex,
-          bubbleHighlight, bubbleFontSize)
+      if !longPressItems.isEmpty {
+        bubbleHighlight = max(0, min(longPressIndex, longPressItems.count - 1))
+        showLongPressBubble()
       } else {
         clearBubble()
         action.onLongPress?(0)
@@ -141,12 +154,13 @@ struct KeyModifier: ViewModifier {
     touchId = (touchId + 1) & 0xFFFF
     let currentTouchId = touchId
     isPressed = true
+    Haptic.keyPress()
     startLocation = location
     lastLocation = location.x
 
     vm.setBubble(
       bubbleX, bubbleY, bubbleWidth, bubbleHeight,
-      bubbleBackground ?? background, colorScheme, shadow,
+      popupBackground, colorScheme, popupShadow,
       bubbleLabel, [], 0, 0, bubbleFontSize)
 
     vm.flushOrderedKeyPresses()
@@ -168,6 +182,20 @@ struct KeyModifier: ViewModifier {
     }
   }
 
+  /// Map a finger offset from the touch start to a popup cell, as sliding over
+  /// fcitx5-android's popup keyboard.
+  private func popupHighlight(_ dx: CGFloat, _ dy: CGFloat) -> Int {
+    let count = longPressItems.count
+    let columns = popupColumns(count)
+    let rows = popupRows(count)
+    let anchor = popupAnchorColumn(
+      keyCenterX: bubbleX, cellWidth: bubbleWidth, columns: columns,
+      preferredColumn: longPressIndex, keyboardWidth: vm.totalWidth)
+    let column = max(0, min(anchor + Int((dx / bubbleWidth).rounded()), columns - 1))
+    let row = max(0, min(Int(((-dy) / bubbleHeight).rounded()), rows - 1))
+    return min(row * columns + column, count - 1)
+  }
+
   private func onTouchMove(_ location: CGPoint) {
     if disable {
       return
@@ -185,11 +213,11 @@ struct KeyModifier: ViewModifier {
         cancelOrderedKeyPress()
       }
       if didMoveFarEnough {
-        if getSwipeDirection(dx, dy) == .up {
+        let direction = getSwipeDirection(dx, dy)
+        if direction == .up || direction == .down, let swipeLabel {
           vm.setBubble(
-            bubbleX, bubbleY, bubbleWidth, bubbleHeight, bubbleBackground ?? background,
-            colorScheme, shadow, swipeUpLabel,
-            [swipeUpItem].compactMap { $0 }, 0, 0, bubbleFontSize)
+            bubbleX, bubbleY, bubbleWidth, bubbleHeight, popupBackground,
+            colorScheme, popupShadow, swipeLabel, [], 0, 0, bubbleFontSize)
         } else {
           clearBubble()
         }
@@ -214,16 +242,11 @@ struct KeyModifier: ViewModifier {
           lastLocation = location.x
         }
       }
-    } else if didTriggerLongPress && longPressItems.count > 1, let last = lastLocation {
-      let delta = getNStep(last, location.x, moveSize)
-      if delta != 0 {
-        bubbleHighlight = max(
-          0, min(bubbleHighlight + delta, longPressItems.count - 1))
-        vm.setBubble(
-          bubbleX, bubbleY, bubbleWidth, bubbleHeight,
-          bubbleBackground ?? background, colorScheme, shadow, nil, longPressItems, longPressIndex,
-          bubbleHighlight, bubbleFontSize)
-        lastLocation = last + CGFloat(delta) * moveSize
+    } else if didTriggerLongPress && longPressItems.count > 1 {
+      let newHighlight = popupHighlight(dx, dy)
+      if newHighlight != bubbleHighlight {
+        bubbleHighlight = newHighlight
+        showLongPressBubble()
       }
     }
   }
@@ -264,7 +287,7 @@ struct KeyModifier: ViewModifier {
       }
     }
 
-    if didTriggerLongPress && bubbleHighlight >= 0
+    if didTriggerLongPress && !longPressItems.isEmpty && bubbleHighlight >= 0
       && bubbleHighlight < longPressItems.count
     {
       action.onLongPress?(bubbleHighlight)
@@ -287,28 +310,30 @@ struct KeyModifier: ViewModifier {
   }
 
   func body(content: Content) -> some View {
+    let tileWidth = width - hMargin
+    let tileHeight = height - vMargin
     VStack {
       if isPressed, let pressedView = pressedView {
         AnyView(pressedView)
       } else {
         content
       }
-    }.frame(width: width - hMargin, height: height - vMargin)
-      .background(isPressed ? pressedBackground : background)
+    }.frame(width: tileWidth, height: tileHeight)
+      .foregroundColor(foreground)
+      // Without key border only the accent (return) key keeps its fill.
+      .background(keyBorder || background == accentBackground ? background : Color.clear)
+      // fcitx5-android draws the press highlight over the key background.
+      .overlay(isPressed ? highlight : Color.clear)
       .cornerRadius(radius)
-      .foregroundColor(isPressed ? pressedForeground : foreground)
-      .overlay(
-        ShadowView(width: width - hMargin, height: 1, radius: radius, color: shadow)
-          .offset(y: (height - vMargin - radius + 1) / 2)
-      )
-      .condition(topRight != nil) {
+      .condition(keyBorder) {
         $0.overlay(
-          // padding right so that / doesn't overflow
-          Text(topRight ?? "").font(.system(size: height * 0.25)).padding(.trailing, 1),
-          alignment: .topTrailing
+          ShadowView(width: tileWidth, height: 1, radius: radius, color: shadow)
+            .offset(y: (tileHeight - radius + 1) / 2)
         )
       }
+      .opacity(disable ? 0.38 : 1)
       .frame(width: width, height: height)
+      .contentShape(Rectangle())
       .gesture(
         DragGesture(minimumDistance: 0)
           .onChanged { value in
@@ -338,27 +363,26 @@ extension View {
     }
   }
 
+  @MainActor
   func keyProperties(
     x: CGFloat = 0, y: CGFloat = 0,
-    width: CGFloat, height: CGFloat, hMargin: CGFloat = columnGap, vMargin: CGFloat = rowGap,
-    radius: CGFloat = keyCornerRadius, background: Color, pressedBackground: Color,
-    foreground: Color, shadow: Color, action: GestureAction, pressedForeground: Color? = nil,
-    pressedView: (any View)? = nil, topRight: String? = nil, bubbleLabel: String? = nil,
-    swipeUpLabel: String? = nil, swipeUpItem: BubbleItem? = nil,
+    width: CGFloat, height: CGFloat, hMargin: CGFloat = columnGap, vMargin: CGFloat? = nil,
+    radius: CGFloat = keyCornerRadius, background: Color,
+    foreground: Color, highlight: Color, shadow: Color, action: GestureAction,
+    pressedView: (any View)? = nil, bubbleLabel: String? = nil,
+    swipeLabel: String? = nil,
     longPressItems: [BubbleItem]? = nil, longPressIndex: Int? = nil,
     bubbleBackground: Color? = nil, bubbleFontSize: CGFloat? = nil, disable: Bool = false
   ) -> some View {
     self.modifier(
       KeyModifier(
-        x: x, y: y, width: width, height: height, hMargin: hMargin, vMargin: vMargin,
+        x: x, y: y, width: width, height: height, hMargin: hMargin, vMargin: vMargin ?? rowGap,
         radius: radius,
         background: background, bubbleBackground: bubbleBackground,
-        bubbleFontSize: bubbleFontSize, pressedBackground: pressedBackground,
-        foreground: foreground, pressedForeground: pressedForeground ?? foreground,
+        bubbleFontSize: bubbleFontSize,
+        foreground: foreground, highlight: highlight,
         shadow: shadow, action: action, disable: disable, pressedView: pressedView,
-        topRight: topRight,
-        bubbleLabel: bubbleLabel, swipeUpLabel: swipeUpLabel,
-        swipeUpItem: swipeUpItem,
+        bubbleLabel: bubbleLabel, swipeLabel: swipeLabel,
         longPressItems: longPressItems ?? [],
         longPressIndex: longPressIndex ?? 0
       )

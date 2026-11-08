@@ -18,4 +18,22 @@ add_custom_command(
 add_custom_target(UndoRedoSwiftTest ALL DEPENDS "${UNDO_REDO_TEST}")
 add_test(NAME UndoRedoSwift COMMAND "${UNDO_REDO_TEST}")
 
+set(GOOGLE_PINYIN_TEST "${CMAKE_CURRENT_BINARY_DIR}/GooglePinyinSwift")
+set(GOOGLE_PINYIN_TEST_SOURCES
+    "${PROJECT_SOURCE_DIR}/src/GooglePinyinUserDict.swift"
+    "${CMAKE_CURRENT_SOURCE_DIR}/testgooglepinyin.swift"
+)
+add_custom_command(
+    OUTPUT "${GOOGLE_PINYIN_TEST}"
+    COMMAND "${XCRUN}" --sdk macosx swiftc
+        -module-cache-path "${CMAKE_CURRENT_BINARY_DIR}/ModuleCache"
+        -parse-as-library
+        ${GOOGLE_PINYIN_TEST_SOURCES}
+        -o "${GOOGLE_PINYIN_TEST}"
+    DEPENDS ${GOOGLE_PINYIN_TEST_SOURCES}
+    VERBATIM
+)
+add_custom_target(GooglePinyinSwiftTest ALL DEPENDS "${GOOGLE_PINYIN_TEST}")
+add_test(NAME GooglePinyinSwift COMMAND "${GOOGLE_PINYIN_TEST}")
+
 add_subdirectory(backup)

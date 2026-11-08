@@ -71,5 +71,18 @@ func testFileSync(root: URL) throws {
   }
   try require(
     !success && changed, "Partial failure remains distinguishable from a successful change")
+
+  // Keyboard-owned pinyin user data is skipped and never overwritten.
+  let userDict = "pinyin/user.dict"
+  try write("main", to: source.appendingPathComponent(userDict))
+  try write("keyboard", to: target.appendingPathComponent(userDict))
+  changed = false
+  try require(
+    sync(source, target, changed: &changed) {
+      $0.path == source.appendingPathComponent(userDict).path
+    }, "Skipping a file still succeeds")
+  try require(
+    String(decoding: try Data(contentsOf: target.appendingPathComponent(userDict)), as: UTF8.self)
+      == "keyboard", "Skipped file keeps the destination copy")
   print("PASS file sync: changed, unchanged, recursive, accumulated and failed-copy results")
 }

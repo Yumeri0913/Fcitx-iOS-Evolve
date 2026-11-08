@@ -136,10 +136,9 @@ struct EditKeyView: View {
   }
 
   var body: some View {
-    let background = normal ? getNormalBackground(colorScheme) : getFunctionBackground(colorScheme)
-    let pressedBackground =
-      normal ? getFunctionBackground(colorScheme) : getNormalBackground(colorScheme)
-    let foreground = getNormalForeground(colorScheme)
+    let theme = currentTheme(colorScheme)
+    let background = normal ? theme.keyBackgroundColor : theme.altKeyBackgroundColor
+    let foreground = normal ? theme.keyTextColor : theme.altKeyTextColor
     let size = getKeyboardHeight(totalHeight) / shrink
     let useWidth = image == "arrowtriangle.up.fill" || image == "arrowtriangle.down.fill"
     let symbol = Image(systemName: image)
@@ -156,9 +155,9 @@ struct EditKeyView: View {
       x: x, y: y, width: width, height: height, hMargin: editKeyGap, vMargin: editKeyGap,
       radius: editKeyCornerRadius,
       background: background,
-      pressedBackground: pressedBackground,
       foreground: foreground,
-      shadow: getShadow(colorScheme),
+      highlight: theme.keyPressHighlightColor,
+      shadow: theme.keyShadowColor,
       action: GestureAction(
         onTap: {
           action()

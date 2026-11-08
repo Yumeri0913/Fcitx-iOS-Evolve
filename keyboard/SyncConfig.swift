@@ -92,6 +92,29 @@ private func downloadFile(_ path: String) async -> Bool {
   return false
 }
 
+// Without App Group the main app can't read the keyboard's pinyin user data, so send
+// it a snapshot for exporting as a Google Pinyin user dictionary.
+private func uploadGooglePinyinWords() async {
+  let file = documents.appendingPathComponent("tmp/googlepinyin-userwords.tsv")
+  mkdirP(file.deletingLastPathComponent().path)
+  defer { let _ = removeFile(file) }
+  guard snapshotGooglePinyinWords(file.path), let data = try? Data(contentsOf: file) else {
+    FCITX_ERROR("Failed to snapshot pinyin user words")
+    return
+  }
+  var request = URLRequest(url: generateURL("/googlepinyin/userwords", params: nil))
+  request.httpMethod = "POST"
+  request.setValue("text/tab-separated-values; charset=utf-8", forHTTPHeaderField: "Content-Type")
+  request.httpBody = data
+  if let (_, response) = try? await URLSession.shared.data(for: request),
+    (response as? HTTPURLResponse)?.statusCode == 200
+  {
+    FCITX_INFO("Uploaded pinyin user words: \(data.count) bytes")
+  } else {
+    FCITX_WARN("Upload pinyin user words failed")
+  }
+}
+
 private func reportDone(_ keyboard: String) async {
   let url = generateURL("/done", params: ["keyboard": keyboard])
   let _ = try? await URLSession.shared.data(from: url)
@@ -140,6 +163,11 @@ func doSyncConfig(_ keyboard: String) async {
         }
       }
       saveChecksums(newChecksums)
+      if keyboard == "Chinese" {
+        // Imports arrive as data/googlepinyin/import-<UUID>.tsv.
+        let result = GooglePinyinImport.applyLive()
+        await MainActor.run { GooglePinyinImport.showResult(result) }
+      }
       do {
         try await ClipboardTransport.synchronize(
           store: clipboardStore, endpoint: generateURL("/clipboard/sync", params: nil))
@@ -150,6 +178,9 @@ func doSyncConfig(_ keyboard: String) async {
         continue
       }
       if Task.isCancelled { return }
+      if keyboard == "Chinese" {
+        await uploadGooglePinyinWords()
+      }
       await vm.refreshClipboard()
       reload()
       await reportDone(keyboard)

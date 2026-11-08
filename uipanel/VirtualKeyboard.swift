@@ -80,6 +80,7 @@ public class ViewModel: ObservableObject {
   @Published var spaceLabel = ""
   @Published var enterLabel = ""
   @Published var enterHighlight = false
+  @Published var returnKeyType: UIReturnKeyType? = nil
   @Published var textIsEmpty = false
   @Published var canUndo = false
   @Published var canRedo = false
@@ -87,6 +88,15 @@ public class ViewModel: ObservableObject {
   @Published var clipboardError: String?
   @Published private(set) var clipboardSuggestionText: String?
   @Published var layer = "default"
+  @Published var themeMode = ThemeMode.followSystem
+  @Published var keyBorder = false
+  // Google Pinyin 中/英: English mode sends keys straight to the app, like
+  // fcitx5-android's inactive keyboard-us. Starts in Chinese (ActiveByDefault).
+  @Published var englishMode = false
+  @Published var languageLabel = "中"
+  // One line message over the keyboard, e.g. Google Pinyin import result.
+  @Published var notice: String?
+  private var noticeID = UUID()
   @Published var lock = false
 
   private var clipboardTask: Task<Void, Never>?
@@ -121,7 +131,7 @@ public class ViewModel: ObservableObject {
     if resetReturnMode || mode == .numpad {
       returnMode = .initial
     } else if self.mode == .numpad
-      && (mode == .edit || mode == .clipboard || mode == .statusArea)
+      && (mode == .edit || mode == .clipboard || mode == .statusArea || mode == .symbol)
     {
       returnMode = .numpad
     } else if self.mode == .candidates && mode == .symbol {
@@ -208,11 +218,41 @@ public class ViewModel: ObservableObject {
 
   func setCurrentInputMethod(_ im: String, _ inputMethods: [InputMethod]) {
     self.inputMethods = inputMethods
-    for inputMethod in inputMethods {
-      if inputMethod.name == im {
-        spaceLabel = inputMethod.displayName
-        break
-      }
+    if let inputMethod = inputMethods.first(where: { $0.name == im }) {
+      currentInputMethod = inputMethod
+    }
+    updateLanguageLabels()
+  }
+
+  private var currentInputMethod: InputMethod?
+
+  func toggleEnglishMode() {
+    client.resetInput()
+    resetLayerIfNotLocked()
+    englishMode.toggle()
+    updateLanguageLabels()
+  }
+
+  private func updateLanguageLabels() {
+    if englishMode {
+      spaceLabel = NSLocalizedString("English", comment: "")
+      languageLabel = "英"
+    } else if let inputMethod = currentInputMethod {
+      spaceLabel = inputMethod.displayName
+      languageLabel =
+        inputMethod.languageCode.hasPrefix("zh") ? "中" : String(inputMethod.displayName.prefix(2))
+    }
+  }
+
+  func setThemeConfig(_ mode: ThemeMode, _ keyBorder: Bool) {
+    themeMode = mode
+    self.keyBorder = keyBorder
+  }
+
+  func setKeyboardHeightMode(_ mode: KeyboardHeightMode) {
+    if keyboardHeightMode != mode {
+      keyboardHeightMode = mode
+      totalHeight = getDefaultTotalHeight()
     }
   }
 
@@ -251,6 +291,18 @@ public class ViewModel: ObservableObject {
       clipboardDisplayText(
         $0, sensitive: clipboardSuggestion.presentedSensitive,
         maskSensitive: isClipboardMaskSensitiveEnabled(), limit: 42)
+    }
+  }
+
+  public func showNotice(_ message: String) {
+    notice = message
+    let id = UUID()
+    noticeID = id
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 4_000_000_000)
+      if self.noticeID == id {
+        self.notice = nil
+      }
     }
   }
 
@@ -332,6 +384,7 @@ public class ViewModel: ObservableObject {
   }
 
   public func setReturnKeyType(_ type: UIReturnKeyType?) {
+    returnKeyType = type
     enterHighlight = true
     switch type {
     case .done:
@@ -477,6 +530,7 @@ public class ViewModel: ObservableObject {
 }
 
 public struct VirtualKeyboardView: View {
+  @Environment(\.colorScheme) var colorScheme
   @ObservedObject var viewModel = vm
 
   public init() {}
@@ -505,8 +559,7 @@ public struct VirtualKeyboardView: View {
                 tabActions: viewModel.tabActions,
                 batch: viewModel.batch, scrollEnd: viewModel.scrollEnd,
                 hasPrev: viewModel.hasPrev, hasNext: viewModel.hasNext,
-                enterLabel: viewModel.enterLabel,
-                enterHighlight: viewModel.enterHighlight,
+                returnKeyType: viewModel.returnKeyType,
                 hasPreedit: viewModel.hasPreedit,
                 expanded: $viewModel.expanded,
                 pendingScroll: $viewModel.pendingScroll)
@@ -528,9 +581,7 @@ public struct VirtualKeyboardView: View {
             KeyboardView(
               width: width, layer: viewModel.layer, lock: viewModel.lock,
               spaceLabel: viewModel.spaceLabel,
-              enterLabel: viewModel.enterLabel,
-              textIsEmpty: viewModel.textIsEmpty,
-              enterHighlight: viewModel.enterHighlight,
+              returnKeyType: viewModel.returnKeyType,
               hasPreedit: viewModel.hasPreedit,
               bubbleX: viewModel.bubbleX,
               bubbleY: viewModel.bubbleY,
@@ -546,7 +597,15 @@ public struct VirtualKeyboardView: View {
             ).opacity(
               viewModel.mode == .initial || (viewModel.mode == .candidates && !viewModel.expanded)
                 ? 1 : 0)  // Don't recreate KeyboardView when mode changes.
-          }.background(transparent)  // .clear will make gaps between candidates not scrollable.
+            // Theme background; an opaque fill also keeps gaps between candidates scrollable.
+          }.background(currentTheme(colorScheme).backgroundColor)
+        }
+        if let notice = viewModel.notice {
+          NoticeView(message: notice)
+            .padding(.horizontal, 8)
+            .frame(width: width, height: barHeight)
+            .onTapGesture { viewModel.notice = nil }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         if viewModel.showMenu {
           ContextMenuOverlay(
@@ -577,6 +636,8 @@ public struct VirtualKeyboardView: View {
         }
       }
       .environment(\.totalHeight, viewModel.totalHeight)
+      .environment(\.keyBorder, viewModel.keyBorder)
+      .environment(\.colorScheme, viewModel.themeMode.resolve(colorScheme))
   }
 
   private func updateSize(_ width: CGFloat) {

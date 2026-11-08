@@ -263,6 +263,11 @@ std::string getAddons() {
         auto addons = nlohmann::json::array();
         auto names =
             instance->addonManager().addonNames(fcitx::AddonCategory::Module);
+        // Keyboard appearance (uipanel) is a UI addon.
+        for (const auto &name :
+             instance->addonManager().addonNames(fcitx::AddonCategory::UI)) {
+            names.insert(name);
+        }
         for (const auto &name : names) {
             const auto *info = instance->addonManager().addonInfo(name);
             if (!info || !info->isConfigurable()) {

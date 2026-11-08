@@ -1,5 +1,6 @@
 set(TRANSLATABLE_CXX_SOURCES
     iosfrontend/iosfrontend.h
+    uipanel/uipanel.h
 )
 
 list(TRANSFORM TRANSLATABLE_CXX_SOURCES PREPEND "${PROJECT_SOURCE_DIR}/"

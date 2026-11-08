@@ -9,6 +9,8 @@ add_library(FcitxRuntime SHARED
     runtime_keyboard.cpp
     runtime_config.cpp
     keycode.cpp
+    googlepinyin_runtime.cpp
+    googlepinyin/userdata.cpp
 )
 set_target_properties(FcitxRuntime PROPERTIES
     FRAMEWORK TRUE
@@ -30,6 +32,7 @@ target_link_libraries(FcitxRuntime
     NotifySwift
     SwiftUtil
     FcitxProtocol
+    LibIME::Pinyin
 )
 # Export the complete shared API, including backup methods used only by the app.
 # Consumers import the Swift modules but use the implementation in FcitxRuntime.

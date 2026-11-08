@@ -60,8 +60,32 @@ InputContext *findInputContext(Instance *instance, std::string_view token) {
 
 UIPanel *ui;
 
+static constexpr char configFile[] = "conf/uipanel.conf";
+
+void UIPanel::reloadConfig() {
+    readAsIni(config_, configFile);
+    applyConfig();
+}
+
+void UIPanel::setConfig(const RawConfig &config) {
+    config_.load(config, true);
+    safeSaveAsIni(config_, configFile);
+    applyConfig();
+}
+
+void UIPanel::applyConfig() {
+    KeyboardUI::setThemeConfigAsync(static_cast<int>(*config_.theme),
+                                    *config_.keyBorder);
+    KeyboardUI::setKeyboardHeightModeAsync(
+        static_cast<int>(*config_.heightMode));
+    KeyboardUI::setVibrationAsync(
+        *config_.vibrate ? static_cast<int>(*config_.vibrationStrength) + 1
+                         : 0);
+}
+
 UIPanel::UIPanel(Instance *instance) : instance_(instance) {
     ui = this;
+    reloadConfig();
     eventHandler_ = instance_->watchEvent(
         EventType::InputContextInputMethodActivated, EventWatcherPhase::Default,
         [this](Event &event) {

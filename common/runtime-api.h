@@ -37,3 +37,22 @@ std::string getConfig(const char *uri);
 void setConfig(const char *uri, const char *value);
 std::string getAddons();
 bool isRegexValid(const char *regex);
+
+// Google Pinyin user words <-> fcitx pinyin user data (user.dict and
+// user.history under <dataHome>/pinyin). TSV is "word\tpin'yin\tcount" lines.
+struct GooglePinyinMergeResult {
+    bool ok;
+    int added;
+    int existing;
+    int invalid;
+};
+// Only when the pinyin engine is not running, e.g. before startKeyboardFcitx.
+GooglePinyinMergeResult mergeGooglePinyinWords(const char *tsvPath,
+                                               const char *dataHome);
+// Read only, safe while the keyboard is running.
+bool exportGooglePinyinWords(const char *dataHome, const char *tsvOut);
+// Keyboard with fcitx running: save, merge, then reload pinyin user data.
+GooglePinyinMergeResult importGooglePinyinWordsLive(const char *tsvPath);
+// Keyboard with fcitx running: save, then export current user words.
+bool snapshotGooglePinyinWords(const char *tsvOut);
+void saveUserData();

@@ -42,3 +42,59 @@ msgstr "清除追踪参数"
 #: iosfrontend/iosfrontend.h
 msgid "Clipboard"
 msgstr "剪贴板"
+
+#: uipanel/uipanel.conf.in.in
+msgid "UIPanel"
+msgstr "键盘外观"
+
+#: uipanel/uipanel.h
+msgid "Theme"
+msgstr "主题"
+
+#: uipanel/uipanel.h
+msgid "Follow system"
+msgstr "跟随系统"
+
+#: uipanel/uipanel.h
+msgid "Light"
+msgstr "浅色"
+
+#: uipanel/uipanel.h
+msgid "Dark"
+msgstr "深色"
+
+#: uipanel/uipanel.h
+msgid "Key border"
+msgstr "按键边框"
+
+#: uipanel/uipanel.h
+msgid "Keyboard height"
+msgstr "键盘高度"
+
+#: uipanel/uipanel.h
+msgid "Same as Google Pinyin"
+msgstr "与谷歌拼音相同"
+
+#: uipanel/uipanel.h
+msgid "Percentage of screen height"
+msgstr "屏幕高度百分比"
+
+#: uipanel/uipanel.h
+msgid "Vibrate on keypress"
+msgstr "按键振动"
+
+#: uipanel/uipanel.h
+msgid "Vibration strength"
+msgstr "振动强度"
+
+#: uipanel/uipanel.h
+msgid "Weak"
+msgstr "弱"
+
+#: uipanel/uipanel.h
+msgid "Medium"
+msgstr "中"
+
+#: uipanel/uipanel.h
+msgid "Strong"
+msgstr "强"

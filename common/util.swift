@@ -14,6 +14,12 @@ public let appGroupTmp = appGroup.appendingPathComponent("tmp")
 public let appGroupData = appGroup.appendingPathComponent("data")
 public let appGroupAvailable = appGroup != documents
 public let clipboardDatabases = appGroup.appendingPathComponent("databases")
+// Google Pinyin words the main app parsed, waiting for the Chinese keyboard to merge
+// them into pinyin user data. Without App Group, they reach the keyboard by Sync config.
+public let googlePinyinImportDirectory =
+  appGroupAvailable
+  ? appGroupTmp.appendingPathComponent("googlepinyin")
+  : documents.appendingPathComponent("data/googlepinyin")
 public let clipboardStore = ClipboardStore(
   directory: clipboardDatabases,
   legacyDirectory: appGroupAvailable ? documents.appendingPathComponent("databases") : nil)
@@ -70,7 +76,12 @@ public func sync(_ src: URL, _ dst: URL) -> Bool {
 }
 
 // Report successful file copies separately from success, which also includes unchanged files.
-public func sync(_ src: URL, _ dst: URL, changed: inout Bool) -> Bool {
+public func sync(
+  _ src: URL, _ dst: URL, changed: inout Bool, skip: (URL) -> Bool = { _ in false }
+) -> Bool {
+  if skip(src) {
+    return true
+  }
   if !src.exists() {
     return false
   }
@@ -83,7 +94,7 @@ public func sync(_ src: URL, _ dst: URL, changed: inout Bool) -> Bool {
     for fileName in (try? FileManager.default.contentsOfDirectory(atPath: src.localPath())) ?? [] {
       if !sync(
         src.appendingPathComponent(fileName), dst.appendingPathComponent(fileName),
-        changed: &changed)
+        changed: &changed, skip: skip)
       {
         success = false
       }

@@ -27,6 +27,28 @@ final class ServerManager: Sendable {
     server["/download"] = ServerManager.downloadHandler
     server["/done"] = ServerManager.doneHandler
     server.POST["/clipboard/sync"] = ServerManager.clipboardHandler
+    server.POST["/googlepinyin/userwords"] = ServerManager.googlePinyinWordsHandler
+  }
+
+  // Snapshot of the Chinese keyboard's pinyin user words, for exporting as a Google
+  // Pinyin user dictionary. The keyboard owns the data, so the latest snapshot wins.
+  private static func googlePinyinWordsHandler(_ request: HttpRequest) -> HttpResponse {
+    guard !appGroupAvailable else { return .forbidden(nil) }
+    let body = Data(request.body)
+    guard body.count <= 64 * 1024 * 1024, String(data: body, encoding: .utf8) != nil else {
+      FCITX_WARN("POST /googlepinyin/userwords 400")
+      return .badRequest(nil)
+    }
+    let file = GooglePinyinUserDict.keyboardWordsSnapshot
+    mkdirP(file.deletingLastPathComponent().path)
+    do {
+      try body.write(to: file, options: .atomic)
+    } catch {
+      FCITX_ERROR("POST /googlepinyin/userwords write failed: \(error)")
+      return .internalServerError(nil)
+    }
+    FCITX_INFO("POST /googlepinyin/userwords bytes=\(body.count) 200")
+    return .ok(.text(""))
   }
 
   private static func clipboardHandler(_ request: HttpRequest) -> HttpResponse {
@@ -80,6 +102,8 @@ final class ServerManager: Sendable {
         enumerate("data/\(subdir)")
       }
       enumerate("data/pinyin", exclude: ["data/pinyin/user.dict", "data/pinyin/user.history"])
+      // Pending Google Pinyin imports; the keyboard records which ones it applied.
+      enumerate("data/googlepinyin")
     } else if keyboard == "Rime" {
       enumerate("data/rime")
     }

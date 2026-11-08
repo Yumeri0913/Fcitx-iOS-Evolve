@@ -20,6 +20,13 @@ struct BackupArchive {
   let dataDirectory: URL
   let databasesDirectory: URL
   var clipboardStore: ClipboardStore? = nil
+  /// When set, pinyin user data from an archive is extracted here (as pinyin/user.dict and
+  /// pinyin/user.history) instead of over the keyboard's files, so the caller can merge it.
+  var pinyinUserDataDirectory: URL? = nil
+
+  private static let pinyinUserDataEntries: Set<String> = [
+    "external/data/pinyin/user.dict", "external/data/pinyin/user.history",
+  ]
 
   private struct ArchiveEntry {
     let sourceURL: URL?
@@ -162,6 +169,12 @@ struct BackupArchive {
       ? [("external/config/", configDirectory), ("external/data/", dataDirectory)]
       : [(Self.hamsterRimePrefix, dataDirectory.appendingPathComponent("rime"))]
     for entry in archive {
+      if source == .fcitx5, let pinyinUserDataDirectory,
+        Self.pinyinUserDataEntries.contains(entry.path)
+      {
+        try extract(entry, from: archive, root: pinyinUserDataDirectory, prefix: "external/data/")
+        continue
+      }
       for (prefix, root) in mappings where entry.path.hasPrefix(prefix) {
         try extract(entry, from: archive, root: root, prefix: prefix)
       }

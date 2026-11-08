@@ -1,22 +1,8 @@
 import SwiftUI
 
-//  ___________
-// /           \ c = 2*r
-// |           |
-// |           |
-// \  _______  /       h = 2*height + 1.5*rowGap - shadowRadius
-//  \/       \/  r
-//   |       |   +
-//   | (x,y) | height - 2*r
-//   |       |   +
-//   \_______/   r
-// s + width + s = w
-//
-// s = 0.4*width
-
-let sideRatio = 0.4
-let shadowRadius: CGFloat = 2
-let cellWidth: CGFloat = 30
+// Key press preview and long press popup keyboard, drawn like fcitx5-android's
+// PopupEntryUi / PopupKeyboardUi: a rounded rectangle directly above the key,
+// each cell the size of the key tile, the focused cell filled with the active color.
 
 struct BubbleItem: Equatable {
   let label: String?
@@ -27,132 +13,15 @@ struct BubbleItem: Equatable {
   }
 }
 
-enum BubblePosition {
-  case left
-  case middle
-  case right
-}
-
-struct BubbleShape: Shape {
-  let s: CGFloat
-  let height: CGFloat
-  let position: BubblePosition
-  let items: [BubbleItem]
-  let index: Int
-
-  func path(in rect: CGRect) -> Path {
-    var path = Path()
-    let w = rect.width
-    let h = rect.height
-    let r = keyCornerRadius
-    let c = r * 2
-    let left =
-      position == .left ? 0 : ((position == .middle ? s : 2 * s) + CGFloat(index) * cellWidth)
-    let right =
-      w
-      - (position == .right
-        ? 0 : ((position == .middle ? s : 2 * s) + CGFloat(items.count - 1 - index) * cellWidth))
-    let leftArc = position != .left && index > 0
-    let rightArc = position != .right && index < items.count - 1
-    let middle = h - height - columnGap
-
-    path.move(to: CGPoint(x: 0, y: c))
-    // top left corner
-    path.addArc(
-      center: CGPoint(x: c, y: c),
-      radius: c,
-      startAngle: .degrees(180),
-      endAngle: .degrees(270),
-      clockwise: false)
-    // top
-    path.addLine(to: CGPoint(x: w - c, y: 0))
-    // top right corner
-    path.addArc(
-      center: CGPoint(x: w - c, y: c),
-      radius: c,
-      startAngle: .degrees(270),
-      endAngle: .degrees(360),
-      clockwise: false)
-    if rightArc {
-      // upper right
-      path.addLine(to: CGPoint(x: w, y: middle - c))
-      path.addArc(
-        center: CGPoint(x: w - c, y: middle - c),
-        radius: c,
-        startAngle: .degrees(0),
-        endAngle: .degrees(90),
-        clockwise: false)
-      // middle right
-      path.addLine(to: CGPoint(x: right + columnGap + r, y: middle))
-      path.addArc(
-        center: CGPoint(x: right + columnGap + r, y: middle + columnGap + r),
-        radius: columnGap + r,
-        startAngle: .degrees(270),
-        endAngle: .degrees(180),
-        clockwise: true)
-    } else {
-      // upper right
-      path.addLine(to: CGPoint(x: w, y: h * 0.4))
-      // middle right
-      path.addCurve(
-        to: CGPoint(x: right, y: h * 0.65),
-        control1: CGPoint(x: w, y: h * 0.55),
-        control2: CGPoint(x: right, y: h * 0.5))
-    }
-    // lower right
-    path.addLine(to: CGPoint(x: right, y: h - r))
-    // bottom right corner
-    path.addArc(
-      center: CGPoint(x: right - r, y: h - r),
-      radius: r,
-      startAngle: .degrees(0),
-      endAngle: .degrees(90),
-      clockwise: false)
-    // bottom
-    path.addLine(to: CGPoint(x: left + r, y: h))
-    // bottom left corner
-    path.addArc(
-      center: CGPoint(x: left + r, y: h - r),
-      radius: r,
-      startAngle: .degrees(90),
-      endAngle: .degrees(180),
-      clockwise: false)
-    if leftArc {
-      // lower left
-      path.addLine(to: CGPoint(x: left, y: middle + columnGap + r))
-      path.addArc(
-        center: CGPoint(x: left - columnGap - r, y: middle + columnGap + r),
-        radius: columnGap + r,
-        startAngle: .degrees(360),
-        endAngle: .degrees(270),
-        clockwise: true)
-      // middle left
-      path.addLine(to: CGPoint(x: c, y: middle))
-      path.addArc(
-        center: CGPoint(x: c, y: middle - c),
-        radius: c,
-        startAngle: .degrees(90),
-        endAngle: .degrees(180),
-        clockwise: false)
-    } else {
-      // lower left
-      path.addLine(to: CGPoint(x: left, y: h * 0.65))
-      // middle left
-      path.addCurve(
-        to: CGPoint(x: 0, y: h * 0.4),
-        control1: CGPoint(x: left, y: h * 0.5),
-        control2: CGPoint(x: 0, y: h * 0.55))
-    }
-    // upper left
-    path.closeSubpath()
-
-    return path
-  }
-}
+let popupShadowRadius: CGFloat = 2  // elevation 2 dp
 
 struct BubbleView: View {
+  @Environment(\.colorScheme) var colorScheme
+
+  /// Key tile center.
   let x: CGFloat
   let y: CGFloat
+  /// Key tile size (key size minus gaps).
   let width: CGFloat
   let height: CGFloat
   let keyboardWidth: CGFloat
@@ -160,75 +29,83 @@ struct BubbleView: View {
   let shadow: Color
   let label: String?
   let items: [BubbleItem]
+  /// Preferred column to place over the key.
   let index: Int
   let highlight: Int
   let fontSize: CGFloat?
 
   @ViewBuilder
-  private func itemView(_ item: BubbleItem, _ h: CGFloat) -> some View {
-    if let type = item.type, ["unicode", "quickphrase"].contains(item.type) {
-      VStack {
-        Image(systemName: type == "unicode" ? "u.circle" : "q.circle")
-          .resizable()
-          .aspectRatio(contentMode: .fit)
-          .frame(height: h * 0.25)
-      }.frame(height: h * 0.3)
+  private func itemView(_ item: BubbleItem, active: Bool) -> some View {
+    let theme = currentTheme(colorScheme)
+    let foreground = active ? theme.genericActiveForegroundColor : theme.popupTextColor
+    if let type = item.type, let symbol = popupItemSymbol(type) {
+      Image(systemName: symbol)
+        .resizable()
+        .aspectRatio(contentMode: .fit)
+        .frame(width: keyIconSize, height: keyIconSize)
+        .foregroundColor(foreground)
     } else {
-      Text(item.label ?? "").font(.system(size: fontSize ?? h * 0.25).weight(.light))
+      Text(item.label ?? "")
+        .font(.system(size: fontSize ?? popupFontSize))
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .foregroundColor(foreground)
     }
   }
 
   var body: some View {
-    let h = 2 * height + 1.5 * rowGap - shadowRadius
-    let s = sideRatio * width
-    let position: BubblePosition =
-      x - width / 2 - s < 0 ? .left : (x + width / 2 + s > keyboardWidth ? .right : .middle)
-    let offsetX = position == .left ? s : (position == .middle ? 0 : -s)
-    let singleTextItem = items.count == 1 && items[0].type == nil
-    if let label = label {
-      BubbleShape(s: s, height: height, position: position, items: [.text(label)], index: 0)
-        .fill(background)
-        .shadow(color: shadow, radius: shadowRadius)
-        .frame(width: (1 + 2 * sideRatio) * width, height: h)
-        .overlay(
-          Text(label).font(.system(size: h * 0.4).weight(.light))
-            .offset(y: -h / 4)
-        )
-        .position(x: x + offsetX, y: y - (h - height) / 2)
-    } else if singleTextItem, let text = items[0].label {
-      // A single text item (e.g. the "return" long-press bubble on a wide key)
-      // is a taller rounded rectangle the same width as the key, with the text
-      // centered in the upper half.
+    let theme = currentTheme(colorScheme)
+    let cells: [BubbleItem] = label.map { [.text($0)] } ?? items
+    let isPreview = label != nil
+    let count = cells.count
+    let columns = popupColumns(count)
+    let rows = popupRows(count)
+    let totalWidth = width * CGFloat(columns)
+    let totalHeight = height * CGFloat(rows)
+    let left = popupLeft(
+      keyCenterX: x, cellWidth: width, columns: columns, preferredColumn: index,
+      keyboardWidth: keyboardWidth)
+    // Bottom row sits where the key tile is; the popup covers the key like Android's
+    // popup entry, which is anchored to the key and extends one key height upward.
+    let bottom = y + height / 2 - height
+    let centerX = left + totalWidth / 2
+    let centerY = bottom - totalHeight / 2
+
+    ZStack(alignment: .topLeading) {
       RoundedRectangle(cornerRadius: keyCornerRadius)
         .fill(background)
-        .shadow(color: shadow, radius: shadowRadius)
-        .frame(width: width, height: h)
-        .overlay(
-          Text(text).font(.system(size: fontSize ?? h * 0.25).weight(.light))
-            .offset(y: -h / 4)
-        )
-        .position(x: x, y: y - (h - height) / 2)
-    } else {
-      let offsetCell = (CGFloat(items.count - 1) / 2 - CGFloat(index)) * cellWidth
-      BubbleShape(s: s, height: height, position: position, items: items, index: index)
-        .fill(background)
-        .shadow(color: shadow, radius: shadowRadius)
-        .frame(
-          width: (1 + 2 * sideRatio) * width + CGFloat(items.count - 1) * cellWidth, height: h
-        )
-        .overlay(
-          HStack(spacing: 0) {
-            ForEach(Array(items.enumerated()), id: \.offset) { i, item in
-              itemView(item, h)
-                .frame(width: cellWidth)
-                .condition(!singleTextItem && i == highlight) {
-                  $0.foregroundColor(.white).background(highlightBackground)
-                }
-                .cornerRadius(keyCornerRadius)
-            }
-          }.offset(y: -h / 4)
-        )
-        .position(x: x + offsetCell + offsetX, y: y - (h - height) / 2)
+        .shadow(color: shadow, radius: popupShadowRadius, y: 1)
+      ForEach(0..<count, id: \.self) { i in
+        // Row 0 is the bottom row, filled first, like PopupKeyboardUi.
+        let row = i / columns
+        let column = i % columns
+        let active = !isPreview && count > 1 && i == highlight
+        ZStack {
+          if active {
+            RoundedRectangle(cornerRadius: keyCornerRadius)
+              .fill(theme.genericActiveBackgroundColor)
+          }
+          itemView(cells[i], active: active)
+        }
+        .frame(width: width, height: height)
+        .offset(x: CGFloat(column) * width, y: CGFloat(rows - 1 - row) * height)
+      }
     }
+    .frame(width: totalWidth, height: totalHeight)
+    .position(x: centerX, y: centerY)
+    .allowsHitTesting(false)
+  }
+}
+
+func popupItemSymbol(_ type: String) -> String? {
+  switch type {
+  case "unicode":
+    return "u.circle"
+  case "quickphrase":
+    return "q.circle"
+  case "emoji":
+    return "face.smiling"
+  default:
+    return nil
   }
 }

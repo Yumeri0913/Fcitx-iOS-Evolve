@@ -3,20 +3,27 @@ import SwiftUtil
 
 let keyRepeatInterval = 0.08
 
-func getNormalBackground(_ colorScheme: ColorScheme) -> Color {
-  return colorScheme == .dark ? darkNormalBackground : lightNormalBackground
+// Key tile colors by fcitx5-android `KeyDef.Appearance.Variant`.
+func keyBackground(_ variant: KeyVariant, _ theme: Theme) -> Color {
+  switch variant {
+  case .normal, .altForeground:
+    return theme.keyBackgroundColor
+  case .alternative:
+    return theme.altKeyBackgroundColor
+  case .accent:
+    return theme.accentKeyBackgroundColor
+  }
 }
 
-func getFunctionBackground(_ colorScheme: ColorScheme) -> Color {
-  return colorScheme == .dark ? darkFunctionBackground : lightFunctionBackground
-}
-
-func getNormalForeground(_ colorScheme: ColorScheme) -> Color {
-  return colorScheme == .dark ? Color.white : Color.black
-}
-
-func getShadow(_ colorScheme: ColorScheme) -> Color {
-  return colorScheme == .dark ? darkShadow : lightShadow
+func keyForeground(_ variant: KeyVariant, _ theme: Theme) -> Color {
+  switch variant {
+  case .normal:
+    return theme.keyTextColor
+  case .altForeground, .alternative:
+    return theme.altKeyTextColor
+  case .accent:
+    return theme.accentKeyTextColor
+  }
 }
 
 func adjustFontSize(_ text: String, _ fontSize: CGFloat, _ widthLimit: CGFloat) -> CGFloat {
@@ -24,45 +31,220 @@ func adjustFontSize(_ text: String, _ fontSize: CGFloat, _ widthLimit: CGFloat) 
   return textWidth <= widthLimit ? fontSize : fontSize * widthLimit / textWidth
 }
 
-struct LongPressCell {
-  let type: String?
-  let label: String?
-  let actions: [[String: String]]
+/// Material icons are 24 dp; shrink only when the tile is too short.
+@MainActor
+func keyIconHeight(_ height: CGFloat) -> CGFloat {
+  return min(keyIconSize, (height - rowGap) * 0.55)
+}
 
-  var bubbleItem: BubbleItem {
-    BubbleItem(label: label, type: type)
+/// Text input from the letter keyboard. English mode bypasses the input method
+/// and commits the key as is, like fcitx5-android's inactive keyboard-us.
+@MainActor
+func typeKey(_ key: String, _ code: String) {
+  if vm.englishMode {
+    client.forwardKey(key, code)
+  } else {
+    client.keyPressed(key, code)
   }
+}
 
-  @MainActor
-  func perform() {
-    switch type {
-    case "unicode":
-      client.resetInput()
-      client.triggerUnicode()
-    case "quickphrase":
-      client.resetInput()
-      client.triggerQuickPhrase()
-    case nil:
-      executeActions(actions)
-    default:
-      FCITX_ERROR("Unknown long press cell type: \(type ?? "")")
+@MainActor
+func performPopupItem(_ item: BubbleItem) {
+  switch item.type {
+  case "unicode":
+    client.resetInput()
+    client.triggerUnicode()
+  case "quickphrase":
+    client.resetInput()
+    client.triggerQuickPhrase()
+  case "emoji":
+    // No emoji picker yet; the symbol picker is the closest window.
+    vm.setDisplayMode(.symbol)
+  case nil:
+    if let label = item.label {
+      vm.resetLayerIfNotLocked()
+      typeKey(label, "")
     }
+  default:
+    FCITX_ERROR("Unknown popup item type: \(item.type ?? "")")
   }
 }
 
-private func parseLongPressCells(_ longPress: [String: Any]?) -> [LongPressCell] {
-  guard let cells = longPress?["cells"] as? [[String: Any]] else {
-    return []
-  }
-  return cells.map { cell in
-    LongPressCell(
-      type: cell["type"] as? String,
-      label: cell["label"] as? String,
-      actions: cell["actions"] as? [[String: String]] ?? [])
+extension View {
+  /// Apply key geometry, gestures and theme colors for a variant.
+  @MainActor
+  func keyTile(
+    x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat,
+    variant: KeyVariant, colorScheme: ColorScheme, action: GestureAction,
+    hMargin: CGFloat = columnGap, vMargin: CGFloat? = nil, radius: CGFloat = keyCornerRadius,
+    pressedView: (any View)? = nil, bubbleLabel: String? = nil, swipeLabel: String? = nil,
+    longPressItems: [BubbleItem]? = nil, longPressIndex: Int? = nil,
+    bubbleFontSize: CGFloat? = nil, disable: Bool = false
+  ) -> some View {
+    let theme = currentTheme(colorScheme)
+    return keyProperties(
+      x: x, y: y, width: width, height: height, hMargin: hMargin, vMargin: vMargin,
+      radius: radius,
+      background: keyBackground(variant, theme),
+      foreground: keyForeground(variant, theme),
+      highlight: theme.keyPressHighlightColor,
+      shadow: theme.keyShadowColor,
+      action: action, pressedView: pressedView, bubbleLabel: bubbleLabel,
+      swipeLabel: swipeLabel, longPressItems: longPressItems, longPressIndex: longPressIndex,
+      bubbleFontSize: bubbleFontSize, disable: disable)
   }
 }
 
-struct KeyView: View {
+/// fcitx5-android `AlphabetKey`: a letter with a punctuation alt label.
+/// Swipe inputs the punctuation, long press shows `popupPreset` alternates.
+struct AlphabetKeyView: View {
+  @Environment(\.colorScheme) var colorScheme
+  let x: CGFloat
+  let y: CGFloat
+  let width: CGFloat
+  let height: CGFloat
+
+  let letter: String
+  let alt: String
+  let shifted: Bool
+
+  private var displayLetter: String {
+    shifted ? letter.uppercased() : letter.lowercased()
+  }
+
+  var body: some View {
+    let theme = currentTheme(colorScheme)
+    let letter = displayLetter
+    let alternates = popupPreset[letter] ?? [alt]
+    let items = alternates.map { BubbleItem.text($0) }
+    let fontSize = getKeyLabelFontSize(height)
+    let altText = Text(alt)
+      .font(.system(size: altLabelFontSize, weight: .bold))
+      .foregroundColor(theme.altKeyTextColor)
+    let landscape = getKeyboardState() == .landscape
+
+    Group {
+      if landscape {
+        // ThemePrefs.PunctuationPosition: top right in landscape.
+        ZStack(alignment: .topTrailing) {
+          Text(letter).font(.system(size: fontSize))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+          altText.padding(.trailing, 4)
+        }
+      } else {
+        // Bottom in portrait: the letter is raised and the punctuation sits below it.
+        VStack(spacing: 0) {
+          Text(letter).font(.system(size: fontSize))
+            .frame(maxHeight: .infinity)
+          altText.padding(.bottom, 2)
+        }
+      }
+    }
+    .keyTile(
+      x: x, y: y, width: width, height: height, variant: .normal, colorScheme: colorScheme,
+      action: GestureAction(
+        onOrderedKeyPress: {
+          return {
+            vm.resetLayerIfNotLocked()
+            typeKey(letter, "Key\(self.letter.uppercased())")
+          }
+        },
+        onLongPress: { index in
+          if index >= 0, index < items.count {
+            performPopupItem(items[index])
+          }
+        },
+        onSwipe: { direction in
+          if direction == .up || direction == .down {
+            vm.resetLayerIfNotLocked()
+            typeKey(alt, "")
+          }
+        }
+      ),
+      bubbleLabel: letter, swipeLabel: alt, longPressItems: items, longPressIndex: 0)
+  }
+}
+
+/// fcitx5-android `SymbolKey`.
+struct SymbolKeyView: View {
+  @Environment(\.colorScheme) var colorScheme
+  let x: CGFloat
+  let y: CGFloat
+  let width: CGFloat
+  let height: CGFloat
+
+  let symbol: String
+  let variant: KeyVariant
+
+  var body: some View {
+    let items = (popupPreset[symbol] ?? []).map { BubbleItem.text($0) }
+    Text(symbol)
+      .font(.system(size: getKeyLabelFontSize(height)))
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
+        action: GestureAction(
+          onOrderedKeyPress: {
+            return {
+              vm.resetLayerIfNotLocked()
+              typeKey(symbol, "")
+            }
+          },
+          onLongPress: { index in
+            if index >= 0, index < items.count {
+              performPopupItem(items[index])
+            }
+          }
+        ),
+        bubbleLabel: symbol, longPressItems: items, longPressIndex: 0)
+  }
+}
+
+/// fcitx5-android `CommaKey`: comma with an emoji badge and a
+/// Emoji / QuickPhrase / Unicode long press menu.
+struct CommaKeyView: View {
+  @Environment(\.colorScheme) var colorScheme
+  let x: CGFloat
+  let y: CGFloat
+  let width: CGFloat
+  let height: CGFloat
+  let variant: KeyVariant
+
+  private let items = [
+    BubbleItem(label: nil, type: "emoji"),
+    BubbleItem(label: nil, type: "quickphrase"),
+    BubbleItem(label: nil, type: "unicode"),
+  ]
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Image(systemName: "face.smiling")
+        .font(.system(size: 13))
+        .padding(.top, 4)
+      Spacer(minLength: 0)
+      Text(",").font(.system(size: getKeyLabelFontSize(height)))
+        .padding(.bottom, 4)
+    }
+    .keyTile(
+      x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
+      action: GestureAction(
+        onOrderedKeyPress: {
+          return {
+            vm.resetLayerIfNotLocked()
+            typeKey(",", "Comma")
+          }
+        },
+        onLongPress: { index in
+          if index >= 0, index < items.count {
+            performPopupItem(items[index])
+          }
+        }
+      ),
+      bubbleLabel: ",", longPressItems: items, longPressIndex: 0)
+  }
+}
+
+/// fcitx5-android `LayoutSwitchKey` ("?123", "ABC", "!?#").
+struct LayoutSwitchKeyView: View {
   @Environment(\.colorScheme) var colorScheme
   let x: CGFloat
   let y: CGFloat
@@ -70,58 +252,27 @@ struct KeyView: View {
   let height: CGFloat
 
   let label: String
-  let key: String
-  let code: String
-  let forward: Bool
-  let subLabel: [String: String]?
-  let swipeUp: [String: Any]?
-  let longPress: [String: Any]?
-
-  private var fontSize: CGFloat {
-    getKeyLabelFontSize(height)
-  }
+  let target: LayoutTarget
+  let variant: KeyVariant
+  let fontSize: CGFloat
 
   var body: some View {
-    let longPressCells = parseLongPressCells(longPress)
     Text(label)
-      .font(.system(size: fontSize, weight: .regular))
-      .keyProperties(
-        x: x, y: y, width: width, height: height,
-        background: getNormalBackground(colorScheme),
-        pressedBackground: getFunctionBackground(colorScheme),
-        foreground: getNormalForeground(colorScheme),
-        shadow: getShadow(colorScheme),
+      .font(.system(size: fontSize, weight: .bold))
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
         action: GestureAction(
-          onOrderedKeyPress: {
-            return {
-              vm.resetLayerIfNotLocked()
-              if forward {
-                client.resetInput()
-                client.forwardKey(key, code)
-              } else {
-                client.keyPressed(key, code)
-              }
-            }
-          },
-          onLongPress: { highlight in
-            if highlight >= 0, highlight < longPressCells.count {
-              longPressCells[highlight].perform()
-            }
-          },
-          onSwipe: { direction in
-            if direction == .up, let swipeUp = swipeUp,
-              let actions = swipeUp["actions"] as? [[String: String]]
-            {
-              executeActions(actions)
+          onTap: {
+            switch target {
+            case .text:
+              vm.setDisplayMode(.initial, resetReturnMode: true)
+            case .number:
+              vm.setDisplayMode(.numpad)
+            case .symbolPicker:
+              vm.setDisplayMode(.symbol)
             }
           }
-        ),
-        topRight: subLabel?["topRight"] as? String,
-        bubbleLabel: label,
-        swipeUpLabel: swipeUp?["label"] as? String,
-        longPressItems: longPressCells.map { $0.bubbleItem },
-        longPressIndex: longPress?["index"] as? Int
-      )
+        ))
   }
 }
 
@@ -137,13 +288,12 @@ struct SpaceView: View {
 
   var body: some View {
     Text(label)
-      .font(.system(size: height * 0.4))
-      .keyProperties(
-        x: x, y: y, width: width, height: height,
-        background: getNormalBackground(colorScheme),
-        pressedBackground: getFunctionBackground(colorScheme),
-        foreground: getNormalForeground(colorScheme),
-        shadow: getShadow(colorScheme),
+      .font(.system(size: spaceLabelFontSize))
+      .lineLimit(1)
+      .minimumScaleFactor(0.6)
+      .padding(.horizontal, 4)
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: .normal, colorScheme: colorScheme,
         action: GestureAction(
           onTap: {
             vm.resetLayerIfNotLocked()
@@ -151,8 +301,11 @@ struct SpaceView: View {
               client.resetInput()
               client.forwardKey(" ", "")
             } else {
-              client.keyPressed(" ", "")
+              typeKey(" ", "")
             }
+          },
+          onLongPress: { _ in
+            showInputMethodPicker(CGRect(x: x, y: y + barHeight, width: width, height: height))
           },
           onSlide: { step in
             if step > 0 {
@@ -170,12 +323,65 @@ struct SpaceView: View {
   }
 }
 
+/// fcitx5-android `MiniSpaceKey` on the number keyboard.
+struct MiniSpaceView: View {
+  @Environment(\.colorScheme) var colorScheme
+  let x: CGFloat
+  let y: CGFloat
+  let width: CGFloat
+  let height: CGFloat
+  let variant: KeyVariant
+
+  var body: some View {
+    Text("⎵")
+      .font(.system(size: getKeyLabelFontSize(height)))
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
+        action: GestureAction(
+          onTap: {
+            vm.resetLayerIfNotLocked()
+            client.resetInput()
+            client.forwardKey(" ", "")
+          }
+        ))
+  }
+}
+
+/// fcitx5-android `NumPadKey`: committed directly, no popup.
+struct NumPadKeyView: View {
+  @Environment(\.colorScheme) var colorScheme
+  let x: CGFloat
+  let y: CGFloat
+  let width: CGFloat
+  let height: CGFloat
+
+  let label: String
+  let code: String
+  let variant: KeyVariant
+  let fontSize: CGFloat
+
+  var body: some View {
+    Text(label)
+      .font(.system(size: min(fontSize, height * 0.7)))
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
+        action: GestureAction(
+          onTap: {
+            vm.resetLayerIfNotLocked()
+            client.resetInput()
+            client.forwardKey(label, code)
+          }
+        ))
+  }
+}
+
 struct BackspaceView: View {
   @Environment(\.colorScheme) var colorScheme
   let x: CGFloat
   let y: CGFloat
   let width: CGFloat
   let height: CGFloat
+  var variant: KeyVariant = .alternative
   var hMargin: CGFloat? = nil
   var vMargin: CGFloat? = nil
   var radius: CGFloat? = nil
@@ -198,19 +404,13 @@ struct BackspaceView: View {
   }
 
   var body: some View {
+    let iconHeight = keyIconHeight(height)
     Image(systemName: "delete.left")
       .resizable()
       .aspectRatio(contentMode: .fit)
-      .frame(height: height * 0.4)
-      .keyProperties(
-        x: x, y: y, width: width, height: height,
-        hMargin: hMargin ?? columnGap,
-        vMargin: vMargin ?? rowGap,
-        radius: radius ?? keyCornerRadius,
-        background: getFunctionBackground(colorScheme),
-        pressedBackground: getNormalBackground(colorScheme),
-        foreground: getNormalForeground(colorScheme),
-        shadow: getShadow(colorScheme),
+      .frame(height: iconHeight)
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
         action: GestureAction(
           onTap: {
             vm.resetLayerIfNotLocked()
@@ -226,10 +426,11 @@ struct BackspaceView: View {
             stopDelete()
           }
         ),
+        hMargin: hMargin ?? columnGap, vMargin: vMargin, radius: radius ?? keyCornerRadius,
         pressedView: Image(systemName: "delete.left.fill")
           .resizable()
           .aspectRatio(contentMode: .fit)
-          .frame(height: height * 0.4)
+          .frame(height: iconHeight)
       )
       .onDisappear {
         stopDelete()
@@ -237,9 +438,9 @@ struct BackspaceView: View {
   }
 }
 
+/// fcitx5-android `LanguageKey`.
 struct GlobeView: View {
   @Environment(\.colorScheme) var colorScheme
-  @Environment(\.totalHeight) var totalHeight
 
   let x: CGFloat
   let y: CGFloat
@@ -250,38 +451,36 @@ struct GlobeView: View {
     Image(systemName: "globe")
       .resizable()
       .aspectRatio(contentMode: .fit)
-      .frame(height: height * 0.45)
-      .keyProperties(
-        x: x, y: y, width: width, height: height,
-        background: getNormalBackground(colorScheme),
-        pressedBackground: getFunctionBackground(colorScheme),
-        foreground: getNormalForeground(colorScheme),
-        shadow: getShadow(colorScheme),
-        action: GestureAction(
-          onTap: {
-            vm.resetLayerIfNotLocked()
-            client.globe()
-          },
-          onLongPress: { _ in
-            let items = vm.inputMethods.map { inputMethod in
-              MenuItem(
-                text: inputMethod.displayName,
-                action: {
-                  vm.resetLayerIfNotLocked()
-                  client.setCurrentInputMethod(inputMethod.name)
-                })
-            }
-            if !items.isEmpty {
-              let frame = CGRect(
-                x: x, y: y + getBarHeight(totalHeight), width: width, height: height)
-              vm.showContextMenu(frame, items)
-            }
-          }
-        )
+      .frame(height: keyIconHeight(height))
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: .altForeground,
+        colorScheme: colorScheme,
+        // Like the InsightKey globe key: only toggles Chinese / English, never
+        // switches to other input methods (long press space for that).
+        action: GestureAction(onTap: { vm.toggleEnglishMode() })
       )
   }
 }
 
+/// Icon for the return key, after fcitx5-android `ReturnKeyDrawableComponent`.
+func returnKeySymbol(_ type: UIReturnKeyType?) -> String {
+  switch type {
+  case .go:
+    return "arrow.right"
+  case .search, .google, .yahoo:
+    return "magnifyingglass"
+  case .send:
+    return "paperplane.fill"
+  case .next, .continue:
+    return "arrow.right.to.line"
+  case .done, .join, .route, .emergencyCall:
+    return "checkmark"
+  default:
+    return "return"
+  }
+}
+
+/// fcitx5-android `ReturnKey`: accent colored with an action icon.
 struct EnterView: View {
   @Environment(\.colorScheme) var colorScheme
   let x: CGFloat
@@ -289,62 +488,39 @@ struct EnterView: View {
   let width: CGFloat
   let height: CGFloat
 
-  let label: String
+  let returnKeyType: UIReturnKeyType?
+  /// Composing: the key commits the preedit, so always show a return icon.
   let cr: Bool
-  let disable: Bool
-  let highlight: Bool
 
   var body: some View {
+    let theme = currentTheme(colorScheme)
     let returnLabel = NSLocalizedString("return", comment: "")
-    let hasReturnLongPress = !cr && label != returnLabel
-    let returnFontSize = labelFontSize(returnLabel)
-    VStack {
-      if cr {
-        Image(systemName: "return")
-          .resizable()
-          .aspectRatio(contentMode: .fit)
-          .frame(height: height * 0.4)
-      } else {
-        Text(label).font(.system(size: labelFontSize(label)))
-      }
-    }
-    .keyProperties(
-      x: x, y: y, width: width, height: height,
-      background: !cr && !disable && highlight
-        ? highlightBackground : getFunctionBackground(colorScheme),
-      pressedBackground: !cr && disable
-        ? getFunctionBackground(colorScheme) : getNormalBackground(colorScheme),
-      foreground: !cr && disable
-        ? disabledForeground
-        : (!cr && highlight ? highlightForeground : getNormalForeground(colorScheme)),
-      shadow: getShadow(colorScheme),
-      action: GestureAction(
-        onTap: {
-          // When !cr && disable, still allow key press, because text empty detection is not reliable.
-          // e.g. In WeChat when the first line is empty and caret is there and the second line is not empty,
-          // it says text is empty but should be sendable.
-          vm.resetLayerIfNotLocked()
-          client.keyPressed("\r", "Enter")
-        },
-        // WeChat has send type (\n) but supports newline, so provide a way to input \r.
-        onLongPress: hasReturnLongPress
-          ? { _ in
+    let symbol = cr ? "return" : returnKeySymbol(returnKeyType)
+    let hasReturnLongPress = !cr && symbol != "return"
+    Image(systemName: symbol)
+      .resizable()
+      .aspectRatio(contentMode: .fit)
+      .frame(height: keyIconHeight(height))
+      .keyTile(
+        x: x, y: y, width: width, height: height, variant: .accent, colorScheme: colorScheme,
+        action: GestureAction(
+          onTap: {
             vm.resetLayerIfNotLocked()
-            client.carriageReturn()
-          }
-          : nil
-      ),
-      pressedForeground: !cr && !disable && highlight ? getNormalForeground(colorScheme) : nil,
-      longPressItems: hasReturnLongPress
-        ? [BubbleItem.text(returnLabel)]
-        : [],
-      bubbleBackground: hasReturnLongPress ? getNormalBackground(colorScheme) : nil,
-      bubbleFontSize: hasReturnLongPress ? returnFontSize : nil
-    )
-  }
-
-  private func labelFontSize(_ text: String) -> CGFloat {
-    adjustFontSize(text, height * 0.32, (width - columnGap) * 0.95)
+            client.keyPressed("\r", "Enter")
+          },
+          // WeChat has send type (\n) but supports newline, so provide a way to input \r.
+          onLongPress: hasReturnLongPress
+            ? { _ in
+              vm.resetLayerIfNotLocked()
+              client.carriageReturn()
+            }
+            : nil
+        ),
+        longPressItems: hasReturnLongPress ? [BubbleItem.text(returnLabel)] : [],
+        bubbleFontSize: hasReturnLongPress
+          ? adjustFontSize(returnLabel, layoutSwitchFontSize, (width - columnGap) * 0.9) : nil
+      )
+      .environment(\.colorScheme, theme.isDark ? .dark : .light)
   }
 }
 
@@ -354,7 +530,8 @@ enum ShiftState {
   case capslock
 }
 
-struct ShiftView: View {
+/// fcitx5-android `CapsKey`: tap for one letter, long press or double tap to lock.
+struct CapsKeyView: View {
   @Environment(\.colorScheme) var colorScheme
   @State private var shiftPressId: Int?
 
@@ -371,18 +548,17 @@ struct ShiftView: View {
     )
     .resizable()
     .aspectRatio(contentMode: .fit)
-    .frame(height: height * 0.4)
-    .keyProperties(
-      x: x, y: y, width: width, height: height,
-      background: getFunctionBackground(colorScheme),
-      pressedBackground: getNormalBackground(colorScheme),
-      foreground: getNormalForeground(colorScheme),
-      shadow: getShadow(colorScheme),
+    .frame(height: keyIconHeight(height))
+    .keyTile(
+      x: x, y: y, width: width, height: height, variant: .alternative, colorScheme: colorScheme,
       action: GestureAction(
         onPress: {
           shiftPressId = vm.beginShiftPress(state: state)
         },
         onDoubleTap: {
+          vm.setLayer("shift", lock: true)
+        },
+        onLongPress: { _ in
           vm.setLayer("shift", lock: true)
         },
         onRelease: {
@@ -396,41 +572,21 @@ struct ShiftView: View {
   }
 }
 
-struct SymbolKeyView: View {
-  @Environment(\.colorScheme) var colorScheme
-  let x: CGFloat
-  let y: CGFloat
-  let width: CGFloat
-  let height: CGFloat
-
-  private let numpadLabel = "123"
-
-  var body: some View {
-    let numpadItem = BubbleItem.text(numpadLabel)
-    Text("#+=")
-      .keyProperties(
-        x: x, y: y, width: width, height: height,
-        background: getFunctionBackground(colorScheme),
-        pressedBackground: getNormalBackground(colorScheme),
-        foreground: getNormalForeground(colorScheme),
-        shadow: getShadow(colorScheme),
-        action: GestureAction(
-          onTap: {
-            vm.setDisplayMode(.symbol)
-          },
-          onLongPress: { _ in
-            vm.setDisplayMode(.numpad)
-          },
-          onSwipe: { direction in
-            if direction == .up {
-              vm.setDisplayMode(.numpad)
-            }
-          }
-        ),
-        topRight: numpadLabel,
-        swipeUpItem: numpadItem,
-        longPressItems: [numpadItem],
-        bubbleBackground: getNormalBackground(colorScheme)
-      )
+/// fcitx5-android SpaceLongPressBehavior.ShowPicker.
+@MainActor
+func showInputMethodPicker(_ frame: CGRect) {
+  let items = vm.inputMethods.map { inputMethod in
+    MenuItem(
+      text: inputMethod.displayName,
+      action: {
+        vm.resetLayerIfNotLocked()
+        if vm.englishMode {
+          vm.toggleEnglishMode()
+        }
+        client.setCurrentInputMethod(inputMethod.name)
+      })
+  }
+  if items.count > 1 {
+    vm.showContextMenu(frame, items)
   }
 }

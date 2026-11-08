@@ -1,14 +1,8 @@
 import SwiftUI
 import UIPanel
 
-let auxPreeditRatio = 0.32  // Same with fcitx5-keyboard-web
 let candidateCountInRow = 10
 let candidateCountInScreen = 36
-let expandIconRatio = 0.3
-let expandButtonRatio = 0.8
-let expandDividerRatio = 0.6
-let expandDividerColor = Color(
-  .sRGB, red: 179 / 255.0, green: 180 / 255.0, blue: 186 / 255.0, opacity: 1)
 
 private func preeditWithCaret(_ preedit: String, _ caret: Int) -> String {
   if preedit.isEmpty {
@@ -28,6 +22,9 @@ private func preeditWithCaret(_ preedit: String, _ caret: Int) -> String {
   return String(preedit.prefix(index) + "‸" + preedit.suffix(preedit.count - index))
 }
 
+/// Candidate bar after fcitx5-android `CandidateUi`: a horizontal candidate list
+/// with a 40 dp expand button at the end. Expanded, it becomes a grid with a
+/// paging / backspace / return column like `ExpandedCandidateWindow`.
 struct CandidateBarView: View {
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.totalHeight) var totalHeight
@@ -45,8 +42,7 @@ struct CandidateBarView: View {
   let scrollEnd: Bool
   let hasPrev: Bool
   let hasNext: Bool
-  let enterLabel: String
-  let enterHighlight: Bool
+  let returnKeyType: UIReturnKeyType?
   let hasPreedit: Bool
   @Binding var expanded: Bool
   @Binding var pendingScroll: Int
@@ -83,13 +79,18 @@ struct CandidateBarView: View {
   }
 
   var body: some View {
+    let theme = currentTheme(colorScheme)
     let barHeight = getBarHeight(totalHeight)
     let keyboardHeight = getKeyboardHeight(totalHeight)
     let hasAuxPreedit = !auxUp.isEmpty || !preedit.isEmpty
-    let barHeightExcludePreedit = hasAuxPreedit ? barHeight * (1 - auxPreeditRatio) : barHeight
-    let marginTop = max((5 * barHeightExcludePreedit - keyboardHeight) / 11, 0)
-    let paddingBottom = max((keyboardHeight - 5 * barHeightExcludePreedit) / 6, 0)
-    let expandedListHeight = barHeightExcludePreedit + keyboardHeight - marginTop
+    // A keyboard extension cannot float the preedit above its frame like Android,
+    // so the preedit shares the bar with the candidates.
+    let stripHeight: CGFloat = hasAuxPreedit ? preeditStripHeight : 0
+    let candidateRowHeight = barHeight - stripHeight
+    let fontSize = hasAuxPreedit ? candidateFontSizeWithPreedit : candidateFontSize
+    let marginTop = max((5 * candidateRowHeight - keyboardHeight) / 11, 0)
+    let paddingBottom = max((keyboardHeight - 5 * candidateRowHeight) / 6, 0)
+    let expandedListHeight = candidateRowHeight + keyboardHeight - marginTop
     let expandedCandidateHeight = expandedListHeight / 6 - paddingBottom
     let expandedListWidth = width * 4 / 5
     let tabActionColumnWidth = expandedListWidth / 6
@@ -100,11 +101,13 @@ struct CandidateBarView: View {
       HStack(spacing: 0) {
         VStack(alignment: .leading, spacing: 0) {
           if hasAuxPreedit {
-            Text(auxUp + preeditWithCaret(preedit, caret)).font(.system(size: preeditFontSize))
-              .frame(
-                height: barHeight * auxPreeditRatio
-              )
-              .padding([.leading], 4)
+            // PreeditUi: key text color, left aligned.
+            Text(auxUp + preeditWithCaret(preedit, caret))
+              .font(.system(size: preeditFontSize))
+              .foregroundColor(theme.keyTextColor)
+              .lineLimit(1)
+              .frame(height: stripHeight)
+              .padding([.leading], 8)
           }
 
           if expanded {
@@ -149,7 +152,7 @@ struct CandidateBarView: View {
                   }
                 }
               }.frame(width: candidateListWidth, height: expandedListHeight)
-                .scrollIndicators(.hidden)  // Hide scroll bar as native keyboard.
+                .scrollIndicators(.hidden)
                 .onChange(of: batch) { _ in
                   proxy.scrollTo(0, anchor: .leading)
                 }
@@ -162,7 +165,7 @@ struct CandidateBarView: View {
                 ForEach(Array(candidates.enumerated()), id: \.offset) { index, candidate in
                   CandidateView(
                     text: candidate, inputContext: inputContext, index: index,
-                    highlighted: highlighted
+                    highlighted: highlighted, fontSize: fontSize
                   ).onAppear {
                     if pendingScroll >= 0 && !scrollEnd
                       && index == candidates.count - candidateCountInRow
@@ -173,12 +176,12 @@ struct CandidateBarView: View {
                 }
                 Spacer()
               }.frame(
-                height: barHeightExcludePreedit
+                height: candidateRowHeight
               )
               // Force re-render, otherwise scrolling to the first candidate may fail due to the first isn't rendered.
               .id(batch)
-            }.scrollIndicators(.hidden)  // Hide scroll bar as native keyboard.
-              .padding([.leading], columnGap / 2)
+            }.scrollIndicators(.hidden)
+              .padding([.leading], 4)
               .onChange(of: [batch, highlighted]) { newValues in
                 // Watch batch instead of candidates because we don't want to reset on loading more.
                 let newHighlighted = newValues[1]
@@ -190,16 +193,12 @@ struct CandidateBarView: View {
           }
         }
 
-        let expandButton = VStack {
-          Image(systemName: expanded ? "chevron.up" : "chevron.down").resizable()
-            .aspectRatio(contentMode: .fit).frame(width: barHeight * expandIconRatio)
-        }.frame(width: barHeight * expandButtonRatio, height: barHeight).onTapGesture {
-          expanded.toggle()
-        }
-
         if expanded {
           VStack(alignment: .trailing, spacing: 0) {  // trailing for collapse button
-            expandButton
+            ToolButton(systemName: "chevron.up") {
+              expanded.toggle()
+            }
+            .frame(height: barHeight)
 
             let keyHeight = keyboardHeight / 4
             let keyWidth = width / 5
@@ -207,14 +206,10 @@ struct CandidateBarView: View {
             Image(systemName: "arrow.up")
               .resizable()
               .aspectRatio(contentMode: .fit)
-              .frame(height: keyHeight * 0.4)
-              .keyProperties(
-                x: 0, y: 0, width: keyWidth, height: keyHeight,
-                background: getFunctionBackground(colorScheme),
-                pressedBackground: getNormalBackground(colorScheme),
-                foreground: scrollDisabledState.up
-                  ? disabledForeground : getNormalForeground(colorScheme),
-                shadow: getShadow(colorScheme),
+              .frame(height: keyIconHeight(keyHeight))
+              .keyTile(
+                x: 0, y: 0, width: keyWidth, height: keyHeight, variant: .alternative,
+                colorScheme: colorScheme,
                 action: GestureAction(
                   onTap: {
                     if pendingScroll >= 0 {
@@ -232,14 +227,10 @@ struct CandidateBarView: View {
             Image(systemName: "arrow.down")
               .resizable()
               .aspectRatio(contentMode: .fit)
-              .frame(height: keyHeight * 0.4)
-              .keyProperties(
-                x: 0, y: 0, width: keyWidth, height: keyHeight,
-                background: getFunctionBackground(colorScheme),
-                pressedBackground: getNormalBackground(colorScheme),
-                foreground: scrollDisabledState.down
-                  ? disabledForeground : getNormalForeground(colorScheme),
-                shadow: getShadow(colorScheme),
+              .frame(height: keyIconHeight(keyHeight))
+              .keyTile(
+                x: 0, y: 0, width: keyWidth, height: keyHeight, variant: .alternative,
+                colorScheme: colorScheme,
                 action: GestureAction(
                   onTap: {
                     if pendingScroll >= 0 {
@@ -258,16 +249,15 @@ struct CandidateBarView: View {
 
             EnterView(
               x: 0, y: 0, width: keyWidth, height: keyHeight,
-              label: enterLabel, cr: hasPreedit,
-              disable: false, highlight: enterHighlight)
+              returnKeyType: returnKeyType, cr: hasPreedit)
           }
         } else {
           if candidates.isEmpty {
             DismissKeyboardButton()
           } else {
-            Rectangle().frame(width: 1, height: barHeight * expandDividerRatio).foregroundColor(
-              expandDividerColor)
-            expandButton
+            ToolButton(systemName: "chevron.down") {
+              expanded.toggle()
+            }
           }
         }
       }

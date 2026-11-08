@@ -1,0 +1,124 @@
+diff --git a/im/pinyin/pinyin.cpp b/im/pinyin/pinyin.cpp
+index 7047c16..fb244a5 100644
+--- a/im/pinyin/pinyin.cpp
++++ b/im/pinyin/pinyin.cpp
+@@ -6,6 +6,8 @@
+  */
+ 
+ #include "pinyin.h"
++#include <cstdlib>
++#include <string_view>
+ 
+ // Use relative path so we don't need import export target.
+ // We want to keep cloudpinyin logic but don't call it.
+@@ -907,36 +909,7 @@ PinyinEngine::PinyinEngine(Instance *instance)
+     prediction_.setUserLanguageModel(ime_->model());
+     prediction_.setPinyinDictionary(ime_->dict());
+ 
+-    do {
+-        auto file =
+-            standardPath.open(StandardPathsType::PkgData, "pinyin/user.dict");
+-
+-        if (!file.isValid()) {
+-            break;
+-        }
+-
+-        try {
+-            IFDStreamBuf buffer(file.fd());
+-            std::istream in(&buffer);
+-            ime_->dict()->load(libime::PinyinDictionary::UserDict, in,
+-                               libime::PinyinDictFormat::Binary);
+-        } catch (const std::exception &e) {
+-            PINYIN_ERROR() << "Failed to load pinyin dict: " << e.what();
+-        }
+-    } while (0);
+-    do {
+-        auto file =
+-            standardPath.open(StandardPathsType::PkgData, "pinyin/user.history",
+-                              StandardPathsMode::User);
+-
+-        try {
+-            IFDStreamBuf buffer(file.fd());
+-            std::istream in(&buffer);
+-            ime_->model()->load(in);
+-        } catch (const std::exception &e) {
+-            PINYIN_ERROR() << "Failed to load pinyin history: " << e.what();
+-        }
+-    } while (0);
++    loadUserData();
+ 
+     ime_->setScoreFilter(1);
+     loadBuiltInDict();
+@@ -2413,6 +2386,10 @@ void PinyinEngine::setSubConfig(const std::string &path,
+         ime_->model()->history().clear();
+     } else if (path == "customphrase") {
+         loadCustomPhrase();
++    } else if (path == "reloaduserdata") {
++        // fcitx5-ios: user.dict and user.history were changed on disk, e.g.
++        // Google Pinyin words merged in.
++        loadUserData();
+     }
+ }
+ 
+@@ -2439,8 +2416,49 @@ void PinyinEngine::doReset(InputContext *inputContext) const {
+     instance_->resetCompose(inputContext);
+ }
+ 
++void PinyinEngine::loadUserData() {
++    const auto &standardPath = StandardPaths::global();
++    do {
++        auto file =
++            standardPath.open(StandardPathsType::PkgData, "pinyin/user.dict");
++
++        if (!file.isValid()) {
++            break;
++        }
++
++        try {
++            IFDStreamBuf buffer(file.fd());
++            std::istream in(&buffer);
++            ime_->dict()->load(libime::PinyinDictionary::UserDict, in,
++                               libime::PinyinDictFormat::Binary);
++        } catch (const std::exception &e) {
++            PINYIN_ERROR() << "Failed to load pinyin dict: " << e.what();
++        }
++    } while (0);
++    do {
++        auto file =
++            standardPath.open(StandardPathsType::PkgData, "pinyin/user.history",
++                              StandardPathsMode::User);
++
++        try {
++            IFDStreamBuf buffer(file.fd());
++            std::istream in(&buffer);
++            ime_->model()->load(in);
++        } catch (const std::exception &e) {
++            PINYIN_ERROR() << "Failed to load pinyin history: " << e.what();
++        }
++    } while (0);
++}
++
+ void PinyinEngine::save() {
+     safeSaveAsIni(config_, "conf/pinyin.conf");
++    // fcitx5-ios: user.dict and user.history belong to the keyboard. The main
++    // app shares the same data directory with App Group, and saving its stale
++    // copy would overwrite words learned in the keyboard.
++    if (const char *env = std::getenv("F5I_ENV");
++        env && std::string_view(env) == "main") {
++        return;
++    }
+     const auto &standardPath = StandardPaths::global();
+     standardPath.safeSave(
+         StandardPathsType::PkgData, "pinyin/user.dict", [this](int fd) {
+diff --git a/im/pinyin/pinyin.h b/im/pinyin/pinyin.h
+index 3023307..c479a51 100644
+--- a/im/pinyin/pinyin.h
++++ b/im/pinyin/pinyin.h
+@@ -496,6 +496,7 @@ private:
+     void loadBuiltInDict();
+     void loadExtraDict();
+     void loadCustomPhrase();
++    void loadUserData();
+     void loadSymbols(const UnixFD &file);
+     void loadDict(const std::string &fullPath,
+                   std::list<std::unique_ptr<TaskToken>> &taskTokens);

@@ -1,28 +1,91 @@
 import SwiftUI
 import SwiftUtil
 
-private func getFlexes(_ keys: [[String: Any]]) -> [CGFloat] {
-  return keys.map({ key in
-    if let flex = key["flex"] as? String,
-      let value = Double(flex)
-    {
-      return CGFloat(value)
-    }
-    return 1
-  })
+/// Horizontal placement of a row, as fcitx5-android `BaseKeyboard`:
+/// fixed percent widths, 0 fills the remaining space, and a row narrower
+/// than the keyboard is centered.
+func keyPositions(_ row: [KeyDef], _ width: CGFloat) -> [(x: CGFloat, width: CGFloat)] {
+  let fixed = row.map { $0.percentWidth }.filter { $0 > 0 }.reduce(0, +)
+  let fills = row.filter { $0.percentWidth == 0 }.count
+  let fillWidth = fills > 0 ? max(0, 1 - fixed) / CGFloat(fills) : 0
+  var x = fills > 0 ? 0 : max(0, 1 - fixed) / 2 * width
+  var result = [(x: CGFloat, width: CGFloat)]()
+  result.reserveCapacity(row.count)
+  for def in row {
+    let w = (def.percentWidth > 0 ? def.percentWidth : fillWidth) * width
+    result.append((x, w))
+    x += w
+  }
+  return result
 }
 
-extension Array where Element == CGFloat {
-  func partialSums() -> [CGFloat] {
-    var result: [CGFloat] = [0]
-    result.reserveCapacity(self.count)
+/// Renders rows of `KeyDef`; shared by the text and number keyboards.
+struct KeyboardRowsView: View {
+  let layout: [[KeyDef]]
+  let width: CGFloat
+  let height: CGFloat
+  let layer: String
+  let lock: Bool
+  let spaceLabel: String
+  let returnKeyType: UIReturnKeyType?
+  let hasPreedit: Bool
 
-    var running: CGFloat = 0
-    for x in self.dropLast() {
-      running += x
-      result.append(running)
+  var body: some View {
+    let rowHeight = height / CGFloat(layout.count)
+    ZStack {
+      ForEach(Array(layout.enumerated()), id: \.offset) { i, row in
+        rowView(row, CGFloat(i) * rowHeight, rowHeight)
+      }
     }
-    return result
+    .frame(width: width, height: height)
+  }
+
+  @ViewBuilder
+  private func rowView(_ row: [KeyDef], _ y: CGFloat, _ height: CGFloat) -> some View {
+    let positions = keyPositions(row, width)
+    ForEach(Array(row.enumerated()), id: \.offset) { i, def in
+      keyView(def, x: positions[i].x, y: y, width: positions[i].width, height: height)
+    }
+  }
+
+  @ViewBuilder
+  private func keyView(_ def: KeyDef, x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat)
+    -> some View
+  {
+    let shifted = layer == "shift"
+    switch def.kind {
+    case .alphabet(let letter, let alt):
+      AlphabetKeyView(
+        x: x, y: y, width: width, height: height, letter: letter, alt: alt, shifted: shifted)
+    case .symbol(let symbol):
+      SymbolKeyView(
+        x: x, y: y, width: width, height: height, symbol: symbol, variant: def.variant)
+    case .comma:
+      CommaKeyView(x: x, y: y, width: width, height: height, variant: def.variant)
+    case .caps:
+      CapsKeyView(
+        x: x, y: y, width: width, height: height,
+        state: shifted ? (lock ? .capslock : .shift) : .normal)
+    case .backspace:
+      BackspaceView(x: x, y: y, width: width, height: height, variant: def.variant)
+    case .layoutSwitch(let label, let target):
+      LayoutSwitchKeyView(
+        x: x, y: y, width: width, height: height, label: label, target: target,
+        variant: def.variant, fontSize: def.fontSize)
+    case .globe:
+      GlobeView(x: x, y: y, width: width, height: height)
+    case .space:
+      SpaceView(x: x, y: y, width: width, height: height, label: spaceLabel, forward: false)
+    case .enter:
+      EnterView(
+        x: x, y: y, width: width, height: height, returnKeyType: returnKeyType, cr: hasPreedit)
+    case .numPad(let label, let code):
+      NumPadKeyView(
+        x: x, y: y, width: width, height: height, label: label, code: code,
+        variant: def.variant, fontSize: def.fontSize)
+    case .miniSpace:
+      MiniSpaceView(x: x, y: y, width: width, height: height, variant: def.variant)
+    }
   }
 }
 
@@ -33,9 +96,7 @@ struct KeyboardView: View {
   let layer: String
   let lock: Bool
   let spaceLabel: String
-  let enterLabel: String
-  let textIsEmpty: Bool
-  let enterHighlight: Bool
+  let returnKeyType: UIReturnKeyType?
   let hasPreedit: Bool
 
   let bubbleX: CGFloat
@@ -50,18 +111,13 @@ struct KeyboardView: View {
   let bubbleHighlight: Int
   let bubbleFontSize: CGFloat?
 
-  @State private var defaultRows = [[String: Any]]()
-  @State private var shiftRows = [[String: Any]]()
-
   var body: some View {
-    let rows = layer == "shift" ? shiftRows : defaultRows
     let keyboardHeight = getKeyboardHeight(totalHeight)
-    let height = keyboardHeight / CGFloat(rows.count)
 
     ZStack {
-      ForEach(Array(rows.enumerated()), id: \.offset) { i, row in
-        renderRow(row, CGFloat(i) * height, width, height)
-      }
+      KeyboardRowsView(
+        layout: KeyboardLayouts.text, width: width, height: keyboardHeight, layer: layer,
+        lock: lock, spaceLabel: spaceLabel, returnKeyType: returnKeyType, hasPreedit: hasPreedit)
       if bubbleLabel != nil || !bubbleItems.isEmpty {
         BubbleView(
           x: bubbleX, y: bubbleY, width: bubbleWidth, height: bubbleHeight,
@@ -70,79 +126,6 @@ struct KeyboardView: View {
           highlight: bubbleHighlight, fontSize: bubbleFontSize)
       }
     }
-    .frame(height: keyboardHeight)
-    .onAppear {
-      setLayout()
-    }
-  }
-
-  func setLayout() {
-    let layoutUrl = appBundleUrl.appendingPathComponent("share/layout/qwerty.json")
-    guard let content = readJSON(layoutUrl) as? [String: Any],
-      let layers = content["layers"] as? [[String: Any]],
-      let defaultLayer = layers.filter({ $0["id"] as? String == "default" }).first,
-      let defaultRows = defaultLayer["rows"] as? [[String: Any]]
-    else {
-      return
-    }
-    self.defaultRows = defaultRows
-    if let shiftLayer = layers.filter({ $0["id"] as? String == "shift" }).first,
-      let shiftRows = shiftLayer["rows"] as? [[String: Any]]
-    {
-      self.shiftRows = shiftRows
-    }
-  }
-
-  func renderRow(_ row: [String: Any], _ y: CGFloat, _ width: CGFloat, _ height: CGFloat)
-    -> some View
-  {
-    guard let keys = row["keys"] as? [[String: Any]] else {
-      return AnyView(EmptyView())
-    }
-    let flexes = getFlexes(keys)
-    let flexSums = flexes.partialSums()
-    let unit = width / flexes.reduce(0, +)
-    return AnyView(
-      ForEach(Array(keys.enumerated()), id: \.offset) { i, key in
-        let keyWidth = flexes[i] * unit
-        let x = flexSums[i] * unit
-        if let type = key["type"] as? String {
-          switch type {
-          case "key":
-            if let label = key["label"] as? String,
-              let k = key["key"] as? String
-            {
-              let subLabel = key["subLabel"] as? [String: String]
-              let swipeUp = key["swipeUp"] as? [String: Any]
-              let longPress = key["longPress"] as? [String: Any]
-              KeyView(
-                x: x, y: y, width: keyWidth, height: height,
-                label: label, key: k, code: "", forward: false, subLabel: subLabel,
-                swipeUp: swipeUp, longPress: longPress)
-            }
-          case "space":
-            SpaceView(
-              x: x, y: y, width: keyWidth, height: height, label: spaceLabel, forward: false)
-          case "backspace":
-            BackspaceView(x: x, y: y, width: keyWidth, height: height)
-          case "globe":
-            GlobeView(x: x, y: y, width: keyWidth, height: height)
-          case "enter":
-            EnterView(
-              x: x, y: y, width: keyWidth, height: height,
-              label: enterLabel, cr: hasPreedit,
-              disable: textIsEmpty && enterHighlight, highlight: enterHighlight)
-          case "shift":
-            ShiftView(
-              x: x, y: y, width: keyWidth, height: height,
-              state: layer == "shift" ? (lock ? .capslock : .shift) : .normal)
-          case "symbol":
-            SymbolKeyView(x: x, y: y, width: keyWidth, height: height)
-          default:
-            EmptyView()
-          }
-        }
-      }
-    )
+    .frame(width: width, height: keyboardHeight)
   }
 }

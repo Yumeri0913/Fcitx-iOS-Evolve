@@ -40,6 +40,8 @@ set(PREBUILDER_SHARE_DIR "${FIND_ROOT_PATH}/share")
 
 set(ENV{PKG_CONFIG_SYSROOT_DIR} "${PROJECT_BINARY_DIR}")
 set(ENV{PKG_CONFIG_PATH} "${PREBUILDER_LIB_DIR}/pkgconfig")
+# Only the prebuilt .pc files are valid for the target; hide Homebrew ones (e.g. lua).
+set(ENV{PKG_CONFIG_LIBDIR} "${PREBUILDER_LIB_DIR}/pkgconfig")
 
 list(APPEND CMAKE_FIND_ROOT_PATH "${FIND_ROOT_PATH}")
 
@@ -143,8 +145,9 @@ add_subdirectory(keyboard)
 add_subdirectory(po)
 add_subdirectory(src)
 
-fcitx5_add_i18n_definition(TARGETS iosfrontend)
+fcitx5_add_i18n_definition(TARGETS iosfrontend uipanel)
 target_compile_definitions(iosfrontend PRIVATE -DFCITX_GETTEXT_DOMAIN=\"fcitx5-ios\")
+target_compile_definitions(uipanel PRIVATE -DFCITX_GETTEXT_DOMAIN=\"fcitx5-ios\")
 
 get_property(RUNTIME_ADDONS GLOBAL PROPERTY FCITX_RUNTIME_ADDONS)
 fcitx5_import_addons(FcitxRuntime

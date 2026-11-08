@@ -10,25 +10,28 @@ struct CandidateAction: Codable, Identifiable {
   let separator: Bool
 }
 
-func getHighlightBackground(_ colorScheme: ColorScheme) -> Color {
-  return colorScheme == .dark ? darkHighlightBackground : lightHighlightBackground
-}
-
+/// fcitx5-android `CandidateItemUi`: 20 sp text in the candidate color with a
+/// press highlight; the fcitx cursor uses the same highlight.
 struct CandidateView: View {
   @Environment(\.colorScheme) var colorScheme
   let text: String
   let inputContext: String
   let index: Int
   let highlighted: Int
+  var fontSize: CGFloat = candidateFontSize
   @State private var isPressed = false
 
   var body: some View {
-    Text(text).font(.system(size: candidateFontSize))
+    let theme = currentTheme(colorScheme)
+    Text(text).font(.system(size: fontSize))
+      .foregroundColor(theme.candidateTextColor)
+      .lineLimit(1)
       .padding([.leading, .trailing], candidateHorizontalPadding)
-      .padding([.top, .bottom], candidateVerticalPadding)
-      .background(index == highlighted || isPressed ? getHighlightBackground(colorScheme) : .clear)
+      .frame(maxHeight: .infinity)
+      .background(index == highlighted || isPressed ? theme.keyPressHighlightColor : .clear)
       .cornerRadius(keyCornerRadius)
       .onTapGesture {
+        Haptic.keyPress()
         selectCandidate(inputContext, Int32(index))
       }.onContextMenu(
         onPressingChanged: { pressing in

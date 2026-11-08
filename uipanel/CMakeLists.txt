@@ -2,6 +2,8 @@ add_library(KeyboardUI STATIC
     keyboardui.swift
     VirtualKeyboard.swift
     Color.swift
+    Theme.swift
+    Layout.swift
     ContextMenu.swift
     Dialog.swift
     Toast.swift
@@ -26,6 +28,7 @@ add_library(KeyboardUI STATIC
     Sync.swift
     ui.swift
     height.swift
+    Haptic.swift
 )
 set_target_properties(KeyboardUI PROPERTIES Swift_MODULE_NAME KeyboardUI)
 target_compile_options(KeyboardUI PUBLIC "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>")

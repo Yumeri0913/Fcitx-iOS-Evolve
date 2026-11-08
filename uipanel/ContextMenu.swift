@@ -1,9 +1,5 @@
 import SwiftUI
 
-func getBackground(_ colorScheme: ColorScheme) -> Color {
-  return colorScheme == .dark ? darkBackground : lightBackground
-}
-
 struct MenuItem: Identifiable {
   let id = UUID()
   let text: String
