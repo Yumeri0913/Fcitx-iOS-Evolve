@@ -5,7 +5,9 @@
 #include "../iosfrontend/iosfrontend.h"
 #include "keycode.h"
 
+#include <fcitx-utils/stringutils.h>
 #include <fcitx/inputmethodmanager.h>
+#include <libime/pinyin/pinyincontext.h>
 #include <quickphrase_public.h>
 #include <unicode_public.h>
 
@@ -52,6 +54,36 @@ void processKey(const char *p, const char *d, const char *k, const char *c,
             fcitx::js_key_to_fcitx_key(
                 key, code, modifiers | 1U << 29 /* KeyState::Virtual */),
             false, surroundingText, cursor, anchor, reset);
+        if (!accepted) {
+            frontend->forwardKey(program, documentIdentifier, key, code);
+        }
+    });
+}
+
+void processKeyWithAlternatives(const char *p, const char *d, const char *k,
+                                const char *c, unsigned int modifiers,
+                                const char *text, unsigned int cursor,
+                                unsigned int anchor, bool reset,
+                                const char *altKeys, const char *altScores) {
+    std::string program = p, documentIdentifier = d, key = k, code = c,
+                surroundingText = text;
+    libime::PinyinContext::KeyAlternatives alternatives;
+    std::string keys = altKeys;
+    auto scores = fcitx::stringutils::split(altScores, ",");
+    for (size_t i = 0; i < keys.size() && i < scores.size(); i++) {
+        alternatives.emplace_back(keys[i],
+                                  std::strtof(scores[i].c_str(), nullptr));
+    }
+    dispatcher->schedule([=] {
+        // The pinyin engine attaches pending alternatives to the next typed
+        // character, so set and clear them around this key event only.
+        libime::PinyinContext::setPendingKeyAlternatives(alternatives);
+        bool accepted = frontend->keyEvent(
+            program, documentIdentifier,
+            fcitx::js_key_to_fcitx_key(
+                key, code, modifiers | 1U << 29 /* KeyState::Virtual */),
+            false, surroundingText, cursor, anchor, reset);
+        libime::PinyinContext::setPendingKeyAlternatives({});
         if (!accepted) {
             frontend->forwardKey(program, documentIdentifier, key, code);
         }

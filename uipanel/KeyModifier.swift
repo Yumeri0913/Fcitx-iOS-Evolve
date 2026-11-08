@@ -3,6 +3,11 @@ import SwiftUtil
 
 struct GestureAction {
   var onOrderedKeyPress: (() -> (() -> Void))? = nil
+  /// Like onOrderedKeyPress, given the touch point in keyboard coordinates.
+  var onOrderedKeyPressAt: ((CGPoint) -> (() -> Void))? = nil
+  /// Called on release after the finger moved off its start, with start and end in
+  /// keyboard coordinates, before onSwipe. Returns true if it handled the touch.
+  var onSlideOff: ((CGPoint, CGPoint) -> Bool)? = nil
   var onPress: (() -> Void)? = nil
   var onTap: (() -> Void)? = nil
   var onDoubleTap: (() -> Void)? = nil
@@ -36,8 +41,11 @@ struct KeyModifier: ViewModifier {
   @Environment(\.colorScheme) var colorScheme
   @Environment(\.keyBorder) var keyBorder
 
-  let threshold: CGFloat = 30
-  let stepSize: CGFloat = 15
+  // Google Pinyin 4.5.2: swipe symbol threshold 16 dp (~2.5 mm), space scrub one
+  // character per 8 pt (~2.8 mm) and only 200 ms after touch down.
+  let threshold: CGFloat = 16
+  let stepSize: CGFloat = 18
+  let slideDelay: TimeInterval = 0.2
 
   @State private var touchId = 0
   @State private var lastTouchTime: Date?
@@ -45,6 +53,7 @@ struct KeyModifier: ViewModifier {
   @State private var isTouchAccepted = false
   @State private var isTouchStarted = false
   @State private var startLocation: CGPoint?
+  @State private var touchStartTime = Date.distantPast
   @State private var lastLocation: CGFloat?
   @State private var didTriggerLongPress = false
   @State private var didMoveFarEnough = false
@@ -74,6 +83,15 @@ struct KeyModifier: ViewModifier {
   let swipeUpLabel: String?
   let longPressItems: [BubbleItem]
   let longPressIndex: Int
+  let longPressDelay: TimeInterval
+  /// Touch area beyond the key's cell, e.g. a and l reach the screen edges.
+  let hitLeading: CGFloat
+  let hitTrailing: CGFloat
+
+  /// Local touch location to keyboard coordinates.
+  private func keyboardPoint(_ location: CGPoint) -> CGPoint {
+    CGPoint(x: x - hitLeading + location.x, y: y + location.y)
+  }
   var bubbleX: CGFloat { x + width / 2 }
   var bubbleY: CGFloat { y + height / 2 }
   var bubbleWidth: CGFloat { width - hMargin }
@@ -158,6 +176,7 @@ struct KeyModifier: ViewModifier {
     isPressed = true
     Haptic.keyPress()
     startLocation = location
+    touchStartTime = touchTime
     lastLocation = location.x
 
     vm.setBubble(
@@ -171,7 +190,9 @@ struct KeyModifier: ViewModifier {
       action.onDoubleTap?()
     } else {  // Single tap
       lastTouchTime = touchTime
-      if let onOrderedKeyPress = action.onOrderedKeyPress {  // Normal keys
+      if let onOrderedKeyPressAt = action.onOrderedKeyPressAt {
+        orderedKeyPressId = vm.beginOrderedKeyPress(onOrderedKeyPressAt(keyboardPoint(location)))
+      } else if let onOrderedKeyPress = action.onOrderedKeyPress {  // Normal keys
         orderedKeyPressId = vm.beginOrderedKeyPress(onOrderedKeyPress())
       } else {  // Shift
         action.onPress?()
@@ -179,7 +200,7 @@ struct KeyModifier: ViewModifier {
     }
 
     // Schedule long press that can be interrupted by move.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + longPressDelay) {
       onTimer(currentTouchId)
     }
   }
@@ -230,7 +251,9 @@ struct KeyModifier: ViewModifier {
     // Process slide and long press + move.
     if let onSlide = action.onSlide {
       if !slideActivated {
-        if abs(dx) >= threshold, let start = startLocation {
+        if abs(dx) >= threshold, Date().timeIntervalSince(touchStartTime) >= slideDelay,
+          let start = startLocation
+        {
           slideActivated = true
           lastLocation = start.x + (dx > 0 ? threshold : -threshold)
         }
@@ -299,6 +322,11 @@ struct KeyModifier: ViewModifier {
     }
 
     if didMoveFarEnough {
+      if !didTriggerLongPress, let onSlideOff = action.onSlideOff, let start = startLocation,
+        onSlideOff(keyboardPoint(start), keyboardPoint(location))
+      {
+        return
+      }
       if !didTriggerLongPress {
         action.onSwipe?(getSwipeDirection(dx, dy))
       }
@@ -337,6 +365,8 @@ struct KeyModifier: ViewModifier {
       }
       .opacity(disable ? 0.38 : 1)
       .frame(width: width, height: height)
+      .padding(.leading, hitLeading)
+      .padding(.trailing, hitTrailing)
       .contentShape(Rectangle())
       .gesture(
         DragGesture(minimumDistance: 0)
@@ -350,7 +380,7 @@ struct KeyModifier: ViewModifier {
           .onEnded { value in
             onTouchEnd(value.location)
           }
-      ).position(x: x + width / 2, y: y + height / 2)
+      ).position(x: x - hitLeading + (hitLeading + width + hitTrailing) / 2, y: y + height / 2)
   }
 }
 
@@ -376,7 +406,8 @@ extension View {
     pressedView: (any View)? = nil, bubbleLabel: String? = nil,
     swipeLabel: String? = nil, swipeUpLabel: String? = nil,
     longPressItems: [BubbleItem]? = nil, longPressIndex: Int? = nil,
-    bubbleBackground: Color? = nil, bubbleFontSize: CGFloat? = nil, disable: Bool = false
+    bubbleBackground: Color? = nil, bubbleFontSize: CGFloat? = nil, disable: Bool = false,
+    longPressDelay: TimeInterval = 0.3, hitLeading: CGFloat = 0, hitTrailing: CGFloat = 0
   ) -> some View {
     self.modifier(
       KeyModifier(
@@ -388,7 +419,8 @@ extension View {
         shadow: shadow, action: action, disable: disable, pressedView: pressedView,
         bubbleLabel: bubbleLabel, swipeLabel: swipeLabel, swipeUpLabel: swipeUpLabel,
         longPressItems: longPressItems ?? [],
-        longPressIndex: longPressIndex ?? 0
+        longPressIndex: longPressIndex ?? 0,
+        longPressDelay: longPressDelay, hitLeading: hitLeading, hitTrailing: hitTrailing
       )
     )
   }

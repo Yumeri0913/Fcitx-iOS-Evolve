@@ -1,5 +1,5 @@
 diff --git a/im/pinyin/pinyin.cpp b/im/pinyin/pinyin.cpp
-index 7047c16..000ed9b 100644
+index 7047c16..c18f4f8 100644
 --- a/im/pinyin/pinyin.cpp
 +++ b/im/pinyin/pinyin.cpp
 @@ -6,6 +6,8 @@
@@ -11,7 +11,18 @@ index 7047c16..000ed9b 100644
  
  // Use relative path so we don't need import export target.
  // We want to keep cloudpinyin logic but don't call it.
-@@ -907,36 +909,7 @@ PinyinEngine::PinyinEngine(Instance *instance)
+@@ -532,8 +534,10 @@ void PinyinEngine::updateUI(InputContext *inputContext) {
+     const auto &context = state->context_;
+     if (context.selected()) {
+         auto sentence = context.sentence();
++        state->undoLearnOnBackspace_ = false;
+         if (shouldLearn(inputContext)) {
+             state->context_.learn();
++            state->undoLearnOnBackspace_ = state->context_.canUndoLearn();
+         }
+         inputContext->commitString(sentence);
+         inputContext->updatePreedit();
+@@ -907,36 +911,7 @@ PinyinEngine::PinyinEngine(Instance *instance)
      prediction_.setUserLanguageModel(ime_->model());
      prediction_.setPinyinDictionary(ime_->dict());
  
@@ -49,7 +60,22 @@ index 7047c16..000ed9b 100644
  
      ime_->setScoreFilter(1);
      loadBuiltInDict();
-@@ -2413,6 +2386,14 @@ void PinyinEngine::setSubConfig(const std::string &path,
+@@ -2098,6 +2073,14 @@ void PinyinEngine::keyEvent(const InputMethodEntry &entry, KeyEvent &event) {
+         return;
+     }
+ 
++    if (state->undoLearnOnBackspace_) {
++        state->undoLearnOnBackspace_ = false;
++        if (event.key().check(FcitxKey_BackSpace) && state->context_.empty()) {
++            PINYIN_DEBUG() << "Undo learning of the last commit";
++            state->context_.undoLearn();
++        }
++    }
++
+     // Small hack to debug tabbed candidate on desktop.
+ #if 0
+     KeyList list;
+@@ -2413,6 +2396,14 @@ void PinyinEngine::setSubConfig(const std::string &path,
          ime_->model()->history().clear();
      } else if (path == "customphrase") {
          loadCustomPhrase();
@@ -64,7 +90,15 @@ index 7047c16..000ed9b 100644
      }
  }
  
-@@ -2439,8 +2420,53 @@ void PinyinEngine::doReset(InputContext *inputContext) const {
+@@ -2429,6 +2420,7 @@ void PinyinEngine::doReset(InputContext *inputContext) const {
+     state->context_.clear();
+     state->context_.clearContextWords();
+     state->predictWords_.reset();
++    state->undoLearnOnBackspace_ = false;
+     inputContext->inputPanel().reset();
+     inputContext->updatePreedit();
+     inputContext->updateUserInterface(UserInterfaceComponent::InputPanel);
+@@ -2439,8 +2431,53 @@ void PinyinEngine::doReset(InputContext *inputContext) const {
      instance_->resetCompose(inputContext);
  }
  
@@ -119,10 +153,21 @@ index 7047c16..000ed9b 100644
      standardPath.safeSave(
          StandardPathsType::PkgData, "pinyin/user.dict", [this](int fd) {
 diff --git a/im/pinyin/pinyin.h b/im/pinyin/pinyin.h
-index 3023307..3514a49 100644
+index 3023307..5f5a22e 100644
 --- a/im/pinyin/pinyin.h
 +++ b/im/pinyin/pinyin.h
-@@ -496,6 +496,8 @@ private:
+@@ -394,6 +394,10 @@ public:
+     int keyReleased_ = -1;
+     int keyReleasedIndex_ = -2;
+     uint64_t lastKeyPressedTime_ = 0;
++
++    // A sentence was just committed and learned; a BackSpace as the very next
++    // key undoes that learning, like the user rejected the commit.
++    bool undoLearnOnBackspace_ = false;
+ };
+ 
+ class PinyinEngine final : public InputMethodEngineV3,
+@@ -496,6 +500,8 @@ private:
      void loadBuiltInDict();
      void loadExtraDict();
      void loadCustomPhrase();

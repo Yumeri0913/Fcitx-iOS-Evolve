@@ -36,6 +36,9 @@ public protocol FcitxProtocol: AnyObject {
   func isCurrentDocument(_ program: String, _ documentIdentifier: String) -> Bool
   func isCurrentProgram(_ program: String) -> Bool
   func keyPressed(_ key: String, _ code: String, _ modifiers: UInt32)
+  /// A letter with the keys its touch may have meant (typed key first) and their log
+  /// likelihoods, for touch-aware pinyin correction.
+  func keyPressed(_ key: String, _ code: String, alternativeKeys: String, scores: [Float])
   func forwardKey(_ key: String, _ code: String)
   func carriageReturn()
   func resetInput()

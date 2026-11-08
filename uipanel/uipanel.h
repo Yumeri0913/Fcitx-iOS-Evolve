@@ -56,6 +56,8 @@ FCITX_CONFIGURATION(
                      "Pinyin.")}};
     OptionWithAnnotation<HeightMode, HeightModeI18NAnnotation> heightMode{
         this, "HeightMode", _("Keyboard height"), HeightMode::GooglePinyin};
+    Option<bool> touchCorrection{this, "TouchCorrection",
+                                 _("Touch-aware smart correction"), true};
     Option<bool> vibrate{this, "Vibrate", _("Vibrate on keypress"), true};
     OptionWithAnnotation<VibrationStrength, VibrationStrengthI18NAnnotation>
         vibrationStrength{this, "VibrationStrength", _("Vibration strength"),

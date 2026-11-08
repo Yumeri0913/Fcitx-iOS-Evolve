@@ -184,6 +184,8 @@ enum KeyBorderMode: Int {
 nonisolated(unsafe) var themeStyle = ThemeStyle.ios
 /// User key radius in pt, or negative to use the theme's.
 nonisolated(unsafe) var keyRadiusSetting = -1
+/// Google Pinyin's 智能更正: send touch alternatives with letter presses.
+nonisolated(unsafe) var touchCorrectionEnabled = true
 
 // Google Pinyin skins: light, dark, or follow the system appearance.
 // Matches the `Theme` option of the uipanel addon config.

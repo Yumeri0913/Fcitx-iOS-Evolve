@@ -494,6 +494,16 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
       surroundingText.anchor, shouldReset)
   }
 
+  public func keyPressed(
+    _ key: String, _ code: String, alternativeKeys: String, scores: [Float]
+  ) {
+    let (surroundingText, documentIdentifier, shouldReset) = surroundingTextForInputEvent()
+    Fcitx.processKeyWithAlternatives(
+      program, documentIdentifier, key, code, 0, surroundingText.text, surroundingText.cursor,
+      surroundingText.anchor, shouldReset, alternativeKeys,
+      scores.map { String($0) }.joined(separator: ","))
+  }
+
   public func forwardKey(_ key: String, _ code: String) {
     // documentContextBeforeInput could be all text or text in current line before cursor.
     // In the latter case, it will be '\n' (in Messages/Telegram) or '\r' (in 微信/Tim, mainly use \n to trigger send)

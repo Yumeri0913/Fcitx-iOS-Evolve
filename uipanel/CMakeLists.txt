@@ -30,6 +30,7 @@ add_library(KeyboardUI STATIC
     height.swift
     Haptic.swift
     ThemePanel.swift
+    SpatialModel.swift
 )
 set_target_properties(KeyboardUI PROPERTIES Swift_MODULE_NAME KeyboardUI)
 target_compile_options(KeyboardUI PUBLIC "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>")

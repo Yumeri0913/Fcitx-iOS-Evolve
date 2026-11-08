@@ -19,6 +19,57 @@ func keyPositions(_ row: [KeyDef], _ width: CGFloat) -> [(x: CGFloat, width: CGF
   return result
 }
 
+/// Google Pinyin cancels a press 0.3 inch away from the key.
+let slideCancelDistance: CGFloat = 0.3 * 163
+
+/// Edge touch extension of a row's first and last key, as Google Pinyin's a and l
+/// reach the screen edges.
+func rowHitExtension(_ positions: [(x: CGFloat, width: CGFloat)], _ width: CGFloat)
+  -> (leading: CGFloat, trailing: CGFloat)
+{
+  guard let first = positions.first, let last = positions.last else { return (0, 0) }
+  return (first.x, max(0, width - last.x - last.width))
+}
+
+/// Letter key cells of the text keyboard in KeyboardRowsView coordinates, for touch
+/// correction and for typing the key a finger slid onto.
+struct LetterGeometry {
+  private var cells = [Character: CGRect]()
+  private var hitCells = [Character: CGRect]()
+  let model: SpatialModel
+
+  init(layout: [[KeyDef]], width: CGFloat, height: CGFloat) {
+    let rowHeight = height / CGFloat(layout.count)
+    for (i, row) in layout.enumerated() {
+      let positions = keyPositions(row, width)
+      let ext = rowHitExtension(positions, width)
+      for (j, def) in row.enumerated() {
+        guard case .alphabet(let letter, _) = def.kind, let char = letter.first else { continue }
+        let cell = CGRect(
+          x: positions[j].x, y: CGFloat(i) * rowHeight, width: positions[j].width,
+          height: rowHeight)
+        cells[char] = cell
+        let leading = j == 0 ? ext.leading : 0
+        let trailing = j == row.count - 1 ? ext.trailing : 0
+        hitCells[char] = CGRect(
+          x: cell.minX - leading, y: cell.minY, width: cell.width + leading + trailing,
+          height: cell.height)
+      }
+    }
+    model = SpatialModel(
+      keys: cells.map { SpatialModel.Key(char: $0.key, rect: $0.value) })
+  }
+
+  func letter(at point: CGPoint) -> Character? {
+    hitCells.first { $0.value.contains(point) }?.key
+  }
+
+  func distance(from char: Character, to point: CGPoint) -> CGFloat {
+    guard let cell = hitCells[char] else { return .infinity }
+    return SpatialModel.Key(char: char, rect: cell).distance(to: point)
+  }
+}
+
 /// Renders rows of `KeyDef`; shared by the text and number keyboards.
 struct KeyboardRowsView: View {
   let layout: [[KeyDef]]
@@ -32,31 +83,40 @@ struct KeyboardRowsView: View {
 
   var body: some View {
     let rowHeight = height / CGFloat(layout.count)
+    let geometry = LetterGeometry(layout: layout, width: width, height: height)
     ZStack {
       ForEach(Array(layout.enumerated()), id: \.offset) { i, row in
-        rowView(row, CGFloat(i) * rowHeight, rowHeight)
+        rowView(row, CGFloat(i) * rowHeight, rowHeight, geometry)
       }
     }
     .frame(width: width, height: height)
   }
 
   @ViewBuilder
-  private func rowView(_ row: [KeyDef], _ y: CGFloat, _ height: CGFloat) -> some View {
+  private func rowView(
+    _ row: [KeyDef], _ y: CGFloat, _ height: CGFloat, _ geometry: LetterGeometry
+  ) -> some View {
     let positions = keyPositions(row, width)
+    let ext = rowHitExtension(positions, width)
     ForEach(Array(row.enumerated()), id: \.offset) { i, def in
-      keyView(def, x: positions[i].x, y: y, width: positions[i].width, height: height)
+      keyView(
+        def, x: positions[i].x, y: y, width: positions[i].width, height: height,
+        geometry: geometry, hitLeading: i == 0 ? ext.leading : 0,
+        hitTrailing: i == row.count - 1 ? ext.trailing : 0)
     }
   }
 
   @ViewBuilder
-  private func keyView(_ def: KeyDef, x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat)
-    -> some View
-  {
+  private func keyView(
+    _ def: KeyDef, x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat,
+    geometry: LetterGeometry, hitLeading: CGFloat, hitTrailing: CGFloat
+  ) -> some View {
     let shifted = layer == "shift"
     switch def.kind {
     case .alphabet(let letter, let alt):
       AlphabetKeyView(
-        x: x, y: y, width: width, height: height, letter: letter, alt: alt, shifted: shifted)
+        x: x, y: y, width: width, height: height, letter: letter, alt: alt, shifted: shifted,
+        geometry: geometry, hitLeading: hitLeading, hitTrailing: hitTrailing)
     case .symbol(let symbol):
       SymbolKeyView(
         x: x, y: y, width: width, height: height, symbol: symbol, variant: def.variant)

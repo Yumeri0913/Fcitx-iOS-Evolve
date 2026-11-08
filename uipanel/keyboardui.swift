@@ -48,6 +48,12 @@ public func setKeyboardHeightModeAsync(_ mode: Int32) {
   }
 }
 
+public func setTouchCorrectionAsync(_ enabled: Bool) {
+  DispatchQueue.main.async {
+    touchCorrectionEnabled = enabled
+  }
+}
+
 // 0 turns vibration off, 1-3 is light / medium / heavy.
 public func setVibrationAsync(_ strength: Int32) {
   DispatchQueue.main.async {

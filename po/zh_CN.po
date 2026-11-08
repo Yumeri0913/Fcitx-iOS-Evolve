@@ -130,3 +130,7 @@ msgstr "开"
 #: uipanel/uipanel.h
 msgid "Off"
 msgstr "关"
+
+#: uipanel/uipanel.h
+msgid "Touch-aware smart correction"
+msgstr "按落点智能纠错"

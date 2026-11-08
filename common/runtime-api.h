@@ -15,6 +15,16 @@ void processKey(const char *program, const char *documentIdentifier,
                 const char *key, const char *code, unsigned int modifiers,
                 const char *surroundingText, unsigned int cursor,
                 unsigned int anchor, bool reset);
+// processKey for a letter with touch alternatives: altKeys are the keys a
+// touch may have meant (typed key first), altScores their log likelihoods
+// joined by ",". Used by the pinyin engine to price keyboard correction.
+void processKeyWithAlternatives(const char *program,
+                                const char *documentIdentifier, const char *key,
+                                const char *code, unsigned int modifiers,
+                                const char *surroundingText,
+                                unsigned int cursor, unsigned int anchor,
+                                bool reset, const char *altKeys,
+                                const char *altScores);
 void resetInput(const char *program, const char *documentIdentifier);
 void triggerUnicode(const char *program, const char *documentIdentifier);
 void triggerQuickPhrase(const char *program, const char *documentIdentifier);

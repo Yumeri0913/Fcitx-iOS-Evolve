@@ -136,8 +136,11 @@ private final class QuickSettings: ObservableObject {
     Binding(
       get: { (optionValue(self.pinyin, "Fuzzy/Correction") ?? "None") != "None" },
       set: { value in
+        // Google Pinyin's 智能更正: keyboard correction priced by touch position.
         self.write(pinyinUri, "Fuzzy/Correction", value ? "QWERTY" : "None")
+        self.write(uipanelUri, "TouchCorrection", value ? "True" : "False")
         self.pinyin = getConfig(pinyinUri)
+        self.uipanel = getConfig(uipanelUri)
       })
   }
 

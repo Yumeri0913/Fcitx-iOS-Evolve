@@ -1,7 +1,9 @@
 import SwiftUI
 import SwiftUtil
 
-let keyRepeatInterval = 0.08
+// Google Pinyin 4.5.2: backspace repeats every 50 ms after a 400 ms hold.
+let keyRepeatInterval = 0.05
+let keyRepeatDelay = 0.4
 
 // Key tile colors by fcitx5-android `KeyDef.Appearance.Variant`.
 func keyBackground(_ variant: KeyVariant, _ theme: Theme) -> Color {
@@ -48,6 +50,17 @@ func typeKey(_ key: String, _ code: String) {
   }
 }
 
+/// A letter press, with touch alternatives for pinyin correction when available.
+@MainActor
+func typeLetter(_ key: String, _ code: String, _ alternatives: KeyAlternatives?) {
+  if !vm.englishMode, let alternatives {
+    client.keyPressed(
+      key, code, alternativeKeys: String(alternatives.keys), scores: alternatives.scores)
+  } else {
+    typeKey(key, code)
+  }
+}
+
 @MainActor
 func performPopupItem(_ item: BubbleItem) {
   switch item.type {
@@ -80,7 +93,8 @@ extension View {
     pressedView: (any View)? = nil, bubbleLabel: String? = nil, swipeLabel: String? = nil,
     swipeUpLabel: String? = nil,
     longPressItems: [BubbleItem]? = nil, longPressIndex: Int? = nil,
-    bubbleFontSize: CGFloat? = nil, disable: Bool = false
+    bubbleFontSize: CGFloat? = nil, disable: Bool = false,
+    longPressDelay: TimeInterval = 0.3, hitLeading: CGFloat = 0, hitTrailing: CGFloat = 0
   ) -> some View {
     let theme = currentTheme(colorScheme)
     return keyProperties(
@@ -93,7 +107,8 @@ extension View {
       action: action, pressedView: pressedView, bubbleLabel: bubbleLabel,
       swipeLabel: swipeLabel, swipeUpLabel: swipeUpLabel, longPressItems: longPressItems,
       longPressIndex: longPressIndex,
-      bubbleFontSize: bubbleFontSize, disable: disable)
+      bubbleFontSize: bubbleFontSize, disable: disable, longPressDelay: longPressDelay,
+      hitLeading: hitLeading, hitTrailing: hitTrailing)
   }
 }
 
@@ -111,6 +126,9 @@ struct AlphabetKeyView: View {
   let letter: String
   let alt: String
   let shifted: Bool
+  var geometry: LetterGeometry? = nil
+  var hitLeading: CGFloat = 0
+  var hitTrailing: CGFloat = 0
 
   private var displayLetter: String {
     shifted ? letter.uppercased() : letter.lowercased()
@@ -159,11 +177,34 @@ struct AlphabetKeyView: View {
     .keyTile(
       x: x, y: y, width: width, height: height, variant: .normal, colorScheme: colorScheme,
       action: GestureAction(
-        onOrderedKeyPress: {
+        onOrderedKeyPressAt: { point in
+          // Google Pinyin sends no touch data for upper case or English letters.
+          let alternatives =
+            touchCorrectionEnabled && !shifted && !vm.englishMode
+            ? geometry?.model.alternatives(Character(letter), point) : nil
           return {
             vm.resetLayerIfNotLocked()
-            typeKey(letter, "Key\(self.letter.uppercased())")
+            typeLetter(letter, "Key\(self.letter.uppercased())", alternatives)
           }
+        },
+        onSlideOff: { start, end in
+          // A vertical slide inputs the symbol or the letter itself (onSwipe).
+          guard abs(end.x - start.x) > abs(end.y - start.y), let geometry else { return false }
+          let target: String
+          if let char = geometry.letter(at: end) {
+            // Sliding onto another letter types the key under the finger.
+            target = String(char)
+          } else if geometry.distance(from: Character(self.letter.lowercased()), to: end)
+            <= slideCancelDistance
+          {
+            target = self.letter
+          } else {
+            return true  // Cancelled 0.3 inch away from the key.
+          }
+          let key = shifted ? target.uppercased() : target.lowercased()
+          vm.resetLayerIfNotLocked()
+          typeKey(key, "Key\(key.uppercased())")
+          return true
         },
         onLongPress: { index in
           if index >= 0, index < items.count {
@@ -189,7 +230,7 @@ struct AlphabetKeyView: View {
         }
       ),
       bubbleLabel: letter, swipeLabel: alt, swipeUpLabel: letter, longPressItems: items,
-      longPressIndex: 0)
+      longPressIndex: 0, hitLeading: hitLeading, hitTrailing: hitTrailing)
   }
 }
 
@@ -458,7 +499,8 @@ struct BackspaceView: View {
         pressedView: Image(systemName: "delete.left.fill")
           .resizable()
           .aspectRatio(contentMode: .fit)
-          .frame(height: iconHeight)
+          .frame(height: iconHeight),
+        longPressDelay: keyRepeatDelay
       )
       .onDisappear {
         stopDelete()

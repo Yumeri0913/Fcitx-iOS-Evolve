@@ -36,4 +36,22 @@ add_custom_command(
 add_custom_target(GooglePinyinSwiftTest ALL DEPENDS "${GOOGLE_PINYIN_TEST}")
 add_test(NAME GooglePinyinSwift COMMAND "${GOOGLE_PINYIN_TEST}")
 
+set(SPATIAL_MODEL_TEST "${CMAKE_CURRENT_BINARY_DIR}/SpatialModelSwift")
+set(SPATIAL_MODEL_TEST_SOURCES
+    "${PROJECT_SOURCE_DIR}/uipanel/SpatialModel.swift"
+    "${CMAKE_CURRENT_SOURCE_DIR}/testspatialmodel.swift"
+)
+add_custom_command(
+    OUTPUT "${SPATIAL_MODEL_TEST}"
+    COMMAND "${XCRUN}" --sdk macosx swiftc
+        -module-cache-path "${CMAKE_CURRENT_BINARY_DIR}/ModuleCache"
+        -parse-as-library
+        ${SPATIAL_MODEL_TEST_SOURCES}
+        -o "${SPATIAL_MODEL_TEST}"
+    DEPENDS ${SPATIAL_MODEL_TEST_SOURCES}
+    VERBATIM
+)
+add_custom_target(SpatialModelSwiftTest ALL DEPENDS "${SPATIAL_MODEL_TEST}")
+add_test(NAME SpatialModelSwift COMMAND "${SPATIAL_MODEL_TEST}")
+
 add_subdirectory(backup)

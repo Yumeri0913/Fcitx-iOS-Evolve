@@ -79,6 +79,7 @@ void UIPanel::applyConfig() {
         static_cast<int>(*config_.keyBorder), *config_.keyRadius);
     KeyboardUI::setKeyboardHeightModeAsync(
         static_cast<int>(*config_.heightMode));
+    KeyboardUI::setTouchCorrectionAsync(*config_.touchCorrection);
     KeyboardUI::setVibrationAsync(
         *config_.vibrate ? static_cast<int>(*config_.vibrationStrength) + 1
                          : 0);
