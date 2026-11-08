@@ -16,6 +16,9 @@ struct GestureAction {
   var onSwipe: ((SwipeDirection) -> Void)? = nil
   var onSlide: ((Int) -> Void)? = nil
   var onRelease: (() -> Void)? = nil
+  /// Google Pinyin space: no slide right after a finger lifted, and the long press timer
+  /// restarts while the finger drifts.
+  var spaceLike = false
 }
 
 enum SwipeDirection {
@@ -55,6 +58,11 @@ struct KeyModifier: ViewModifier {
   @State private var isTouchStarted = false
   @State private var startLocation: CGPoint?
   @State private var touchStartTime = Date.distantPast
+  @State private var longPressToken = 0
+  @State private var lastDriftX: CGFloat = 0
+  @State private var slideSuppressed = false
+  @State private var rolloverCommitted = false
+  @State private var wasDoubleTap = false
   @State private var lastLocation: CGFloat?
   @State private var didTriggerLongPress = false
   @State private var didMoveFarEnough = false
@@ -94,7 +102,8 @@ struct KeyModifier: ViewModifier {
     CGPoint(x: x - hitLeading + location.x, y: y + location.y)
   }
   var bubbleX: CGFloat { x + width / 2 }
-  var bubbleY: CGFloat { y + height / 2 }
+  // Keys are drawn at the top of their cell, see body.
+  var bubbleY: CGFloat { y + (height - vMargin) / 2 }
   var bubbleWidth: CGFloat { width - hMargin }
   var bubbleHeight: CGFloat { height - vMargin }
 
@@ -140,6 +149,31 @@ struct KeyModifier: ViewModifier {
       bubbleHighlight, bubbleFontSize)
   }
 
+  private func scheduleLongPress() {
+    longPressToken &+= 1
+    let token = longPressToken
+    DispatchQueue.main.asyncAfter(deadline: .now() + longPressDelay) {
+      if longPressToken == token {
+        onTimer(touchId)
+      }
+    }
+  }
+
+  /// Register what another finger touching down should commit: a long press popup
+  /// selection, or stop a repeating key.
+  private func registerRollover() {
+    let id = touchId
+    vm.rolloverHandlers[id] = {
+      guard touchId == id, isPressed, didTriggerLongPress else { return }
+      rolloverCommitted = true
+      clearBubble()
+      if !longPressItems.isEmpty, bubbleHighlight >= 0, bubbleHighlight < longPressItems.count {
+        action.onLongPress?(bubbleHighlight)
+      }
+      action.onRelease?()
+    }
+  }
+
   private func onTimer(_ currentTouchId: Int) {
     if touchId != currentTouchId {
       // Called from a previous touch.
@@ -151,6 +185,7 @@ struct KeyModifier: ViewModifier {
     if isPressed && !didTriggerLongPress && !didMoveFarEnough {
       cancelOrderedKeyPress()
       didTriggerLongPress = true
+      registerRollover()
       if !longPressItems.isEmpty {
         bubbleHighlight = max(0, min(longPressIndex, longPressItems.count - 1))
         showLongPressBubble()
@@ -166,16 +201,6 @@ struct KeyModifier: ViewModifier {
       return
     }
     isTouchStarted = true
-    // A tap just below the candidate bar is meant for the candidate above it, not the
-    // top row key: the top row's touch area starts with its vertical margin.
-    if y == 0, location.y < rowGap / 2 + candidateTouchSlop,
-      let index = vm.candidateIndex(atX: x - hitLeading + location.x)
-    {
-      isTouchAccepted = false
-      Haptic.keyPress()
-      selectCandidate(vm.inputContext, Int32(index))
-      return
-    }
     if disable {
       isTouchAccepted = false
       return
@@ -183,12 +208,14 @@ struct KeyModifier: ViewModifier {
     isTouchAccepted = true
     let touchTime = Date()
     touchId = (touchId + 1) & 0xFFFF
-    let currentTouchId = touchId
     isPressed = true
     Haptic.keyPress()
     startLocation = location
     touchStartTime = touchTime
     lastLocation = location.x
+    lastDriftX = location.x
+    rolloverCommitted = false
+    slideSuppressed = action.spaceLike && touchTime.timeIntervalSince(vm.lastTouchUpTime) < 0.15
 
     vm.setBubble(
       bubbleX, bubbleY, bubbleWidth, bubbleHeight,
@@ -196,11 +223,12 @@ struct KeyModifier: ViewModifier {
       bubbleLabel, [], 0, 0, bubbleFontSize)
 
     vm.flushOrderedKeyPresses()
-    if isDoubleTap(touchTime) {
+    vm.commitHeldKeys(except: touchId)
+    wasDoubleTap = isDoubleTap(touchTime)
+    if wasDoubleTap {
       lastTouchTime = nil
       action.onDoubleTap?()
     } else {  // Single tap
-      lastTouchTime = touchTime
       if let onOrderedKeyPressAt = action.onOrderedKeyPressAt {
         orderedKeyPressId = vm.beginOrderedKeyPress(onOrderedKeyPressAt(keyboardPoint(location)))
       } else if let onOrderedKeyPress = action.onOrderedKeyPress {  // Normal keys
@@ -211,9 +239,7 @@ struct KeyModifier: ViewModifier {
     }
 
     // Schedule long press that can be interrupted by move.
-    DispatchQueue.main.asyncAfter(deadline: .now() + longPressDelay) {
-      onTimer(currentTouchId)
-    }
+    scheduleLongPress()
   }
 
   /// Map a finger offset from the touch start to a popup cell, as sliding over
@@ -259,8 +285,13 @@ struct KeyModifier: ViewModifier {
         }
       }
     }
+    // Google Pinyin space: a drifting finger restarts the long press timer (~0.5 pt).
+    if action.spaceLike, !didTriggerLongPress, abs(location.x - lastDriftX) >= 0.5 {
+      lastDriftX = location.x
+      scheduleLongPress()
+    }
     // Process slide and long press + move.
-    if let onSlide = action.onSlide {
+    if let onSlide = action.onSlide, !slideSuppressed {
       if !slideActivated {
         if abs(dx) >= threshold, Date().timeIntervalSince(touchStartTime) >= slideDelay,
           let start = startLocation
@@ -290,7 +321,13 @@ struct KeyModifier: ViewModifier {
   }
 
   private func onTouchEnd(_ location: CGPoint) {
-    clearBubble()
+    vm.clearBubbleLater()
+    vm.lastTouchUpTime = Date()
+    // Google Pinyin double tap: touch down within 300 ms after the previous release.
+    if action.onDoubleTap != nil {
+      lastTouchTime = wasDoubleTap || didTriggerLongPress ? nil : Date()
+    }
+    vm.rolloverHandlers.removeValue(forKey: touchId)
     defer {
       cancelOrderedKeyPress()
       if isTouchAccepted {
@@ -307,7 +344,7 @@ struct KeyModifier: ViewModifier {
       bubbleHighlight = 0
     }
 
-    if !isTouchAccepted {
+    if !isTouchAccepted || rolloverCommitted {
       return
     }
 
@@ -375,7 +412,9 @@ struct KeyModifier: ViewModifier {
         )
       }
       .opacity(disable ? 0.38 : 1)
-      .frame(width: width, height: height)
+      // Google Pinyin draws keys at the top of their cell with the whole vertical gap below,
+      // so the touch area reaches below the visible key (fingers tend to hit low).
+      .frame(width: width, height: height, alignment: .top)
       .padding(.leading, hitLeading)
       .padding(.trailing, hitTrailing)
       .contentShape(Rectangle())

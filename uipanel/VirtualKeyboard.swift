@@ -530,11 +530,39 @@ public class ViewModel: ObservableObject {
     client.slideBackspace(step)
   }
 
+  /// Changes whenever a bubble is set, so a delayed dismissal leaves newer ones alone.
+  private(set) var bubbleToken = 0
+
+  /// Google Pinyin keeps the key preview 100 ms after release.
+  func clearBubbleLater() {
+    let token = bubbleToken
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+      if self.bubbleToken == token {
+        self.setBubble(0, 0, 0, 0, .clear, .light, .clear, nil, [], 0, 0, nil)
+      }
+    }
+  }
+
+  /// When a finger last lifted, for Google Pinyin's space scrub inhibition.
+  var lastTouchUpTime = Date.distantPast
+  /// Held keys to commit when another finger touches down: long press popups commit
+  /// their selection, repeating delete stops.
+  var rolloverHandlers = [Int: () -> Void]()
+
+  func commitHeldKeys(except id: Int) {
+    let handlers = rolloverHandlers.filter { $0.key != id }
+    for (key, handler) in handlers {
+      rolloverHandlers.removeValue(forKey: key)
+      handler()
+    }
+  }
+
   func setBubble(
     _ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat, _ background: Color,
     _ colorScheme: ColorScheme, _ shadow: Color, _ label: String?, _ items: [BubbleItem],
     _ index: Int, _ highlight: Int, _ fontSize: CGFloat?
   ) {
+    bubbleToken &+= 1
     bubbleX = x
     bubbleY = y
     bubbleWidth = width

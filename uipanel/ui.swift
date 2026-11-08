@@ -6,8 +6,11 @@ import SwiftUI
 // fcitx5-android insets every side of a key by the margin, so the gap between
 // neighbouring keys is twice the preference value.
 let columnGap: CGFloat = 6  // key_horizontal_margin 3 dp
-let rowGapPortrait: CGFloat = 14  // key_vertical_margin 7 dp
-let rowGapLandscape: CGFloat = 8  // key_vertical_margin_landscape 4 dp
+// Google Pinyin 4.5.2: 10 dp gap below each key in portrait, 4 dp in landscape.
+let rowGapPortrait: CGFloat = 10
+let rowGapLandscape: CGFloat = 4
+/// Google Pinyin keyboard body top padding.
+let keyboardTopPadding: CGFloat = 6
 
 // KeyDef text sizes.
 let keyLabelFontSize: CGFloat = 23
@@ -39,5 +42,3 @@ let disabledForeground = Color.gray
 
 /// Name of the keyboard root coordinate space.
 let keyboardSpace = "fcitxKeyboard"
-/// How far below the key margin a top row touch still selects the candidate above.
-let candidateTouchSlop: CGFloat = 5

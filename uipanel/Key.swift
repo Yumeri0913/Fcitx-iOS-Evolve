@@ -188,18 +188,22 @@ struct AlphabetKeyView: View {
           }
         },
         onSlideOff: { start, end in
-          // A vertical slide inputs the symbol or the letter itself (onSwipe).
-          guard abs(end.x - start.x) > abs(end.y - start.y), let geometry else { return false }
-          let target: String
-          if let char = geometry.letter(at: end) {
-            // Sliding onto another letter types the key under the finger.
-            target = String(char)
-          } else if geometry.distance(from: Character(self.letter.lowercased()), to: end)
-            <= slideCancelDistance
-          {
-            target = self.letter
-          } else {
-            return true  // Cancelled 0.3 inch away from the key.
+          // Letters never leave vertically: up types the letter, down the symbol (onSwipe).
+          // A tie counts as horizontal.
+          let dx = end.x - start.x
+          guard abs(end.y - start.y) <= abs(dx), let geometry,
+            let own = geometry.visibleRect(Character(self.letter.lowercased()))
+          else { return false }
+          // Google Pinyin hysteresis: the finger must pass this key's visible edge and be on
+          // the next key's visible part; 0.3 inch past the edge any key under it counts.
+          let beyond = dx > 0 ? end.x - own.maxX : own.minX - end.x
+          var target = self.letter
+          if beyond > 0 {
+            if let char = geometry.letter(onVisibleKeyAt: end) {
+              target = String(char)
+            } else if beyond > slideCancelDistance, let char = geometry.letter(at: end) {
+              target = String(char)
+            }
           }
           let key = shifted ? target.uppercased() : target.lowercased()
           vm.resetLayerIfNotLocked()
@@ -326,7 +330,8 @@ struct LayoutSwitchKeyView: View {
   let fontSize: CGFloat
 
   var body: some View {
-    Text(label)
+    // Google Pinyin labels the way back to letters 返回.
+    Text(target == .text ? NSLocalizedString("Back", comment: "") : label)
       .font(.system(size: fontSize, weight: .bold))
       .keyTile(
         x: x, y: y, width: width, height: height, variant: variant, colorScheme: colorScheme,
@@ -386,7 +391,8 @@ struct SpaceView: View {
                 client.keyPressed("", "ArrowLeft")
               }
             }
-          }
+          },
+          spaceLike: true
         )
       )
   }

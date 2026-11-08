@@ -125,11 +125,12 @@ enum KeyboardLayouts {
         .layoutSwitch("ABC", .text), width: 0.15, variant: .alternative,
         fontSize: layoutSwitchFontSize, bold: true),
       numPad(",", width: 0.1, variant: .alternative),
+      // Google Pinyin digit keyboard bottom row: 150/100/100/300/100/100/150.
       KeyDef(
-        .layoutSwitch("!?#", .symbolPicker), width: 0.13333, variant: .altForeground,
+        .layoutSwitch("!?#", .symbolPicker), width: 0.1, variant: .altForeground,
         fontSize: layoutSwitchFontSize, bold: true),
-      numPad("0", width: 0.23334, fontSize: numPadDigitFontSize),
-      numPad("=", width: 0.13333, variant: .altForeground),
+      numPad("0", width: 0.3, fontSize: numPadDigitFontSize),
+      numPad("=", width: 0.1, variant: .altForeground),
       numPad(".", width: 0.1, variant: .alternative),
       KeyDef(.enter, width: 0.15, variant: .accent),
     ],

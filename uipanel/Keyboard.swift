@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftUtil
+import UIPanel
 
 /// Horizontal placement of a row, as fcitx5-android `BaseKeyboard`:
 /// fixed percent widths, 0 fills the remaining space, and a row narrower
@@ -39,15 +40,15 @@ struct LetterGeometry {
   let model: SpatialModel
 
   init(layout: [[KeyDef]], width: CGFloat, height: CGFloat) {
-    let rowHeight = height / CGFloat(layout.count)
+    let rowHeight = (height - keyboardTopPadding) / CGFloat(layout.count)
     for (i, row) in layout.enumerated() {
       let positions = keyPositions(row, width)
       let ext = rowHitExtension(positions, width)
       for (j, def) in row.enumerated() {
         guard case .alphabet(let letter, _) = def.kind, let char = letter.first else { continue }
         let cell = CGRect(
-          x: positions[j].x, y: CGFloat(i) * rowHeight, width: positions[j].width,
-          height: rowHeight)
+          x: positions[j].x, y: keyboardTopPadding + CGFloat(i) * rowHeight,
+          width: positions[j].width, height: rowHeight)
         cells[char] = cell
         let leading = j == 0 ? ext.leading : 0
         let trailing = j == row.count - 1 ? ext.trailing : 0
@@ -64,9 +65,41 @@ struct LetterGeometry {
     hitCells.first { $0.value.contains(point) }?.key
   }
 
+  /// The drawn key: the cell minus side margins and the gap below.
+  @MainActor
+  func visibleRect(_ char: Character) -> CGRect? {
+    guard let cell = cells[char] else { return nil }
+    return CGRect(
+      x: cell.minX + columnGap / 2, y: cell.minY, width: cell.width - columnGap,
+      height: cell.height - rowGap)
+  }
+
+  @MainActor
+  func letter(onVisibleKeyAt point: CGPoint) -> Character? {
+    cells.keys.first { visibleRect($0)?.contains(point) ?? false }
+  }
+
   func distance(from char: Character, to point: CGPoint) -> CGFloat {
     guard let cell = hitCells[char] else { return .infinity }
     return SpatialModel.Key(char: char, rect: cell).distance(to: point)
+  }
+}
+
+/// The keyboard's top padding: a tap just below the candidate bar is meant for the
+/// candidate above it, not the top row.
+struct CandidateTouchStrip: View {
+  let width: CGFloat
+
+  var body: some View {
+    Color.black.opacity(0.001)
+      .frame(width: width, height: keyboardTopPadding)
+      .contentShape(Rectangle())
+      .onTapGesture { location in
+        if let index = vm.candidateIndex(atX: location.x) {
+          Haptic.keyPress()
+          selectCandidate(vm.inputContext, Int32(index))
+        }
+      }
   }
 }
 
@@ -82,12 +115,13 @@ struct KeyboardRowsView: View {
   let hasPreedit: Bool
 
   var body: some View {
-    let rowHeight = height / CGFloat(layout.count)
+    let rowHeight = (height - keyboardTopPadding) / CGFloat(layout.count)
     let geometry = LetterGeometry(layout: layout, width: width, height: height)
-    ZStack {
+    ZStack(alignment: .topLeading) {
       ForEach(Array(layout.enumerated()), id: \.offset) { i, row in
-        rowView(row, CGFloat(i) * rowHeight, rowHeight, geometry)
+        rowView(row, keyboardTopPadding + CGFloat(i) * rowHeight, rowHeight, geometry)
       }
+      CandidateTouchStrip(width: width)
     }
     .frame(width: width, height: height)
   }
