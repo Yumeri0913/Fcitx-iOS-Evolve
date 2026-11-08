@@ -84,8 +84,7 @@ func performPopupItem(_ item: BubbleItem) {
     client.resetInput()
     client.triggerQuickPhrase()
   case "emoji":
-    // No emoji picker yet; the symbol picker is the closest window.
-    vm.setDisplayMode(.symbol)
+    vm.setDisplayMode(.emoji)
   case nil:
     if let label = item.label {
       vm.resetLayerIfNotLocked()

@@ -14,6 +14,7 @@ public enum DisplayMode {
   case symbol
   case numpad
   case theme
+  case emoji
   case syncPending
   case syncRunning
   case syncDone
@@ -85,6 +86,80 @@ public class ViewModel: ObservableObject {
   @Published var enterHighlight = false
   @Published var returnKeyType: UIReturnKeyType? = nil
   @Published var urlOrEmail = false
+
+  // Gboard style emoji search: while active, text the keyboard commits goes to the
+  // search box instead of the editor (see KeyboardViewController), and composing text
+  // is shown there.
+  @Published public private(set) var emojiSearchActive = false
+  @Published var emojiQuery = ""
+  @Published var emojiSearchPreedit = ""
+  @Published var emojiResults = [String]()
+  private var bypassSearchSink = false
+
+  /// Whether text the keyboard commits should go to the emoji search box.
+  public var searchTakesInput: Bool { emojiSearchActive && !bypassSearchSink }
+
+  func startEmojiSearch() {
+    client.resetInput()
+    emojiQuery = ""
+    emojiSearchPreedit = ""
+    emojiResults = []
+    emojiSearchActive = true
+    setDisplayMode(.initial, resetReturnMode: true)
+  }
+
+  func endEmojiSearch() {
+    client.resetInput()
+    emojiSearchActive = false
+    emojiSearchPreedit = ""
+    setDisplayMode(.emoji)
+  }
+
+  /// The keyboard hides: typing must go to the editor next time.
+  public func cancelEmojiSearch() {
+    if emojiSearchActive {
+      emojiSearchActive = false
+      emojiSearchPreedit = ""
+      setDisplayMode(.initial, resetReturnMode: true)
+    }
+  }
+
+  func clearEmojiQuery() {
+    client.resetInput()
+    emojiQuery = ""
+    emojiResults = []
+  }
+
+  public func searchCommit(_ text: String) {
+    // Pinyin candidates include emojis: picking one is picking the result.
+    if let first = text.unicodeScalars.first, first.properties.isEmojiPresentation {
+      commitEmoji(text)
+      return
+    }
+    emojiQuery += text
+    emojiResults = EmojiSearcher.search(emojiQuery)
+  }
+
+  public func searchSetPreedit(_ preedit: String) {
+    emojiSearchPreedit = preedit
+  }
+
+  public func searchDeleteBackward() {
+    if !emojiQuery.isEmpty {
+      emojiQuery.removeLast()
+      emojiResults = EmojiSearcher.search(emojiQuery)
+    }
+  }
+
+  /// Commit to the editor even while emoji search takes the input.
+  func commitToDocument(_ text: String) {
+    bypassSearchSink = true
+    if !emojiSearchActive {
+      client.resetInput()
+    }
+    client.commitString(text)
+    bypassSearchSink = false
+  }
   @Published var textIsEmpty = false
   @Published var canUndo = false
   @Published var canRedo = false
@@ -616,7 +691,13 @@ public struct VirtualKeyboardView: View {
           SyncDoneView()
         } else {
           VStack(spacing: 0) {
-            if viewModel.mode == .initial {
+            // While searching, predictions after a commit don't hide the search box.
+            if viewModel.emojiSearchActive
+              && (viewModel.mode == .initial
+                || (viewModel.mode == .candidates && viewModel.emojiSearchPreedit.isEmpty))
+            {
+              EmojiSearchBar(width: width)
+            } else if viewModel.mode == .initial {
               ToolbarView(width: width)
             } else if viewModel.mode == .candidates {
               CandidateBarView(
@@ -633,6 +714,11 @@ public struct VirtualKeyboardView: View {
                 expanded: $viewModel.expanded,
                 pendingScroll: $viewModel.pendingScroll)
             }
+            if viewModel.emojiSearchActive
+              && (viewModel.mode == .initial || viewModel.mode == .candidates)
+            {
+              EmojiResultsRow(width: width)
+            }
             if viewModel.mode == .statusArea {
               StatusAreaView(
                 width: width, inputContext: viewModel.inputContext, actions: $viewModel.actions)
@@ -646,6 +732,8 @@ public struct VirtualKeyboardView: View {
               SymbolView(width: width)
             } else if viewModel.mode == .theme {
               ThemePanelView(width: width)
+            } else if viewModel.mode == .emoji {
+              EmojiView(width: width)
             } else if viewModel.mode == .numpad {
               NumpadView(width: width)
             }
@@ -697,7 +785,10 @@ public struct VirtualKeyboardView: View {
         updateSize(newWidth)
       }
     }.coordinateSpace(name: keyboardSpace)
-      .frame(height: viewModel.totalHeight)
+      // Emoji search adds a row of results above the keyboard.
+      .frame(
+        height: viewModel.totalHeight + (viewModel.emojiSearchActive ? emojiResultsRowHeight : 0)
+      )
       .overlay {
         if viewModel.showOpenURLFullAccessDialog {
           FullAccessDialogView(

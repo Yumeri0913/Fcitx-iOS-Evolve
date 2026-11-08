@@ -98,6 +98,10 @@ if (CHINESE_ADDONS)
     copy_share_to(Chinese copy_directory "fcitx5/chttrans")
     copy_share_to(Chinese copy_directory "opencc")
 
+    # Emoji search keywords (CLDR annotations of fcitx5's emoji module)
+    copy_to(Chinese copy "${PROJECT_SOURCE_DIR}/fcitx5/src/modules/emoji/data/zh.dict" "share/emoji/zh.dict")
+    copy_to(Chinese copy "${PROJECT_SOURCE_DIR}/fcitx5/src/modules/emoji/data/en.dict" "share/emoji/en.dict")
+
     # Assets
     add_dependencies(ChineseExtension png_images)
     copy_to(Chinese copy "${PROJECT_BINARY_DIR}/full-punc.png" "share/png/full-punc.png")

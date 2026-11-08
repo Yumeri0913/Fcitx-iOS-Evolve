@@ -457,6 +457,7 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
     acceptsFcitxCommands = false
     inputTraitsState = nil
     Fcitx.focusOut(program, currentDocumentIdentifier())
+    vm.cancelEmojiSearch()
     UserDataSaver.saveIfNeeded()
     stopDocumentPolling()
     stopClipboardMonitoring()
@@ -505,6 +506,15 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
   }
 
   public func forwardKey(_ key: String, _ code: String) {
+    if vm.searchTakesInput {
+      // Emoji search: backspace edits the search box, other keys type into it.
+      if code == "Backspace" {
+        vm.searchDeleteBackward()
+      } else if code != "Enter" && !key.isEmpty && !code.hasPrefix("Arrow") {
+        vm.searchCommit(key)
+      }
+      return
+    }
     // documentContextBeforeInput could be all text or text in current line before cursor.
     // In the latter case, it will be '\n' (in Messages/Telegram) or '\r' (in 微信/Tim, mainly use \n to trigger send)
     // if caret is at the start of a non-first line.
@@ -700,6 +710,10 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
   }
 
   public func commitString(_ commit: String) {
+    if vm.searchTakesInput {
+      vm.searchCommit(commit)
+      return
+    }
     if !hasMarkedText {
       observeCurrentDocumentState()
     }
@@ -710,7 +724,7 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
   }
 
   public func deleteSurroundingText(_ offset: Int, _ size: Int) {
-    guard size > 0 else { return }
+    guard size > 0, !vm.searchTakesInput else { return }
 
     if !hasMarkedText {
       observeCurrentDocumentState()
@@ -764,6 +778,10 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
   }
 
   public func setPreedit(_ preedit: String, _ caret: Int) {
+    if vm.searchTakesInput {
+      vm.searchSetPreedit(preedit)
+      return
+    }
     if !preedit.isEmpty && !hasMarkedText {
       observeCurrentDocumentState()
       hasMarkedText = true
@@ -938,6 +956,9 @@ class KeyboardViewController: UIInputViewController, FcitxProtocol {
   }
 
   public func slideBackspace(_ step: Int) {
+    if vm.searchTakesInput {
+      return
+    }
     if step == 0 {
       removedBySlide = ""
       if isSlidingBackspace {

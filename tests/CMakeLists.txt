@@ -54,4 +54,24 @@ add_custom_command(
 add_custom_target(SpatialModelSwiftTest ALL DEPENDS "${SPATIAL_MODEL_TEST}")
 add_test(NAME SpatialModelSwift COMMAND "${SPATIAL_MODEL_TEST}")
 
+set(EMOJI_SEARCH_TEST "${CMAKE_CURRENT_BINARY_DIR}/EmojiSearchSwift")
+set(EMOJI_SEARCH_TEST_SOURCES
+    "${PROJECT_SOURCE_DIR}/uipanel/EmojiSearch.swift"
+    "${CMAKE_CURRENT_SOURCE_DIR}/testemojisearch.swift"
+)
+add_custom_command(
+    OUTPUT "${EMOJI_SEARCH_TEST}"
+    COMMAND "${XCRUN}" --sdk macosx swiftc
+        -module-cache-path "${CMAKE_CURRENT_BINARY_DIR}/ModuleCache"
+        -parse-as-library
+        ${EMOJI_SEARCH_TEST_SOURCES}
+        -o "${EMOJI_SEARCH_TEST}"
+    DEPENDS ${EMOJI_SEARCH_TEST_SOURCES}
+    VERBATIM
+)
+add_custom_target(EmojiSearchSwiftTest ALL DEPENDS "${EMOJI_SEARCH_TEST}")
+add_test(NAME EmojiSearchSwift COMMAND "${EMOJI_SEARCH_TEST}"
+    "${PROJECT_SOURCE_DIR}/fcitx5/src/modules/emoji/data/zh.dict"
+    "${PROJECT_SOURCE_DIR}/fcitx5/src/modules/emoji/data/en.dict")
+
 add_subdirectory(backup)

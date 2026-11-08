@@ -31,6 +31,9 @@ add_library(KeyboardUI STATIC
     Haptic.swift
     ThemePanel.swift
     SpatialModel.swift
+    EmojiData.swift
+    EmojiSearch.swift
+    Emoji.swift
 )
 set_target_properties(KeyboardUI PROPERTIES Swift_MODULE_NAME KeyboardUI)
 target_compile_options(KeyboardUI PUBLIC "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>")
