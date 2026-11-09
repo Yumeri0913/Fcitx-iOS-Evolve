@@ -25,6 +25,13 @@ enum SwipeDirection {
   case up, down, left, right
 }
 
+/// A swipe is decided where the finger lifts, by its offset from where it went down: the
+/// larger axis beyond the threshold. Rolling or sliding back on the way types the key
+/// itself.
+private func isSwipe(_ dx: CGFloat, _ dy: CGFloat) -> Bool {
+  max(abs(dx), abs(dy)) > 16 * slideDistanceRatio
+}
+
 private func getSwipeDirection(_ dx: CGFloat, _ dy: CGFloat) -> SwipeDirection {
   if abs(dx) > abs(dy) {
     return dx > 0 ? .right : .left
@@ -275,13 +282,18 @@ struct KeyModifier: ViewModifier {
         cancelOrderedKeyPress()
       }
       if didMoveFarEnough {
+        // Shows what lifting the finger here would type, see isSwipe.
         let direction = getSwipeDirection(dx, dy)
-        if direction == .up || direction == .down,
+        if isSwipe(dx, dy), direction == .up || direction == .down,
           let label = direction == .up ? swipeUpLabel ?? swipeLabel : swipeLabel
         {
           vm.setBubble(
             bubbleX, bubbleY, bubbleWidth, bubbleHeight, popupBackground,
             colorScheme, popupShadow, label, [], 0, 0, bubbleFontSize)
+        } else if keyPopupEnabled {
+          vm.setBubble(
+            bubbleX, bubbleY, bubbleWidth, bubbleHeight, popupBackground,
+            colorScheme, popupShadow, bubbleLabel, [], 0, 0, bubbleFontSize)
         } else {
           clearBubble()
         }
@@ -378,7 +390,18 @@ struct KeyModifier: ViewModifier {
         return
       }
       if !didTriggerLongPress {
-        action.onSwipe?(getSwipeDirection(dx, dy))
+        if isSwipe(dx, dy) {
+          action.onSwipe?(getSwipeDirection(dx, dy))
+        } else if let start = startLocation {
+          // Came back near where it went down: the key itself.
+          if let press = action.onOrderedKeyPressAt {
+            press(keyboardPoint(start))()
+          } else if let press = action.onOrderedKeyPress {
+            press()()
+          } else {
+            action.onTap?()
+          }
+        }
       }
     } else {
       if !didTriggerLongPress {
