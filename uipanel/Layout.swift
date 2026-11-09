@@ -32,6 +32,8 @@ enum KeyKind {
   /// Number keyboard key: committed directly, no popup.
   case numPad(String, code: String)
   case miniSpace
+  /// Empty room for a view laid over it, like the number keyboard's side panel.
+  case blank
 }
 
 struct KeyDef {
@@ -64,6 +66,12 @@ private func numPad(
   let code = label.count == 1 && label.first!.isNumber ? "Numpad\(label)" : ""
   return KeyDef(.numPad(label, code: code), width: width, variant: variant, fontSize: fontSize)
 }
+
+/// Google Pinyin digit keyboard side columns, 149 of 1000.
+let numberSideWidth: CGFloat = 0.149
+/// Google Pinyin digit keyboard left panel, four shown at a time.
+let numberSidePanel = ["+", "-", "*", "/", "(", ")"]
+let numberSidePanelVisible = 4
 
 enum KeyboardLayouts {
   // TextKeyboard.Layout with Google Pinyin 4.5.2's key symbols (typed by swiping up)
@@ -98,27 +106,30 @@ enum KeyboardLayouts {
   ]
 
   // NumberKeyboard.Layout
+  /// Google Pinyin 4.x digit keyboard (keyboard_non_prime_digit): a scrollable column of
+  /// `numberSidePanel` on the left (laid over the blank keys, see NumpadView), 1-9, and # space
+  /// backspace on the right. Columns weigh 149/702/149 like Google's.
   static let number: [[KeyDef]] = [
     [
-      numPad("+", width: 0.15, variant: .alternative),
+      KeyDef(.blank, width: numberSideWidth),
       numPad("1", width: 0, fontSize: numPadDigitFontSize),
       numPad("2", width: 0, fontSize: numPadDigitFontSize),
       numPad("3", width: 0, fontSize: numPadDigitFontSize),
-      numPad("/", width: 0.15, variant: .alternative),
+      numPad("#", width: numberSideWidth, variant: .alternative),
     ],
     [
-      numPad("-", width: 0.15, variant: .alternative),
+      KeyDef(.blank, width: numberSideWidth),
       numPad("4", width: 0, fontSize: numPadDigitFontSize),
       numPad("5", width: 0, fontSize: numPadDigitFontSize),
       numPad("6", width: 0, fontSize: numPadDigitFontSize),
-      KeyDef(.miniSpace, width: 0.15, variant: .alternative),
+      KeyDef(.miniSpace, width: numberSideWidth, variant: .alternative),
     ],
     [
-      numPad("*", width: 0.15, variant: .alternative),
+      KeyDef(.blank, width: numberSideWidth),
       numPad("7", width: 0, fontSize: numPadDigitFontSize),
       numPad("8", width: 0, fontSize: numPadDigitFontSize),
       numPad("9", width: 0, fontSize: numPadDigitFontSize),
-      KeyDef(.backspace, width: 0.15, variant: .alternative),
+      KeyDef(.backspace, width: numberSideWidth, variant: .alternative),
     ],
     [
       KeyDef(
@@ -127,7 +138,7 @@ enum KeyboardLayouts {
       numPad(",", width: 0.1, variant: .alternative),
       // Google Pinyin digit keyboard bottom row: 150/100/100/300/100/100/150.
       KeyDef(
-        .layoutSwitch("!?#", .symbolPicker), width: 0.1, variant: .altForeground,
+        .layoutSwitch("@?#", .symbolPicker), width: 0.1, variant: .altForeground,
         fontSize: layoutSwitchFontSize, bold: true),
       numPad("0", width: 0.3, fontSize: numPadDigitFontSize),
       numPad("=", width: 0.1, variant: .altForeground),

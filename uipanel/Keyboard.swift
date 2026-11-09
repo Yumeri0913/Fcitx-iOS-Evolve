@@ -185,6 +185,8 @@ struct KeyboardRowsView: View {
         variant: def.variant, fontSize: def.fontSize)
     case .miniSpace:
       MiniSpaceView(x: x, y: y, width: width, height: height, variant: def.variant)
+    case .blank:
+      EmptyView()
     }
   }
 }

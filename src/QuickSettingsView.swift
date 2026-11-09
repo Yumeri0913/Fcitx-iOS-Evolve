@@ -223,6 +223,8 @@ struct QuickSettingsView: View {
         Toggle("Traditional Chinese", isOn: settings.traditionalBinding)
         Toggle("Suggest English words", isOn: settings.pinyinBool("SpellEnabled"))
         Toggle("Chinese prediction", isOn: settings.pinyinBool("Prediction"))
+        // Off like Google Pinyin: v stays pinyin, so vpn, vip, vivo are typed like any word.
+        Toggle("V triggers quick phrase", isOn: settings.pinyinBool("VAsQuickphrase"))
         Toggle("Smart correction", isOn: settings.correction)
         Toggle("Fuzzy pinyin", isOn: settings.fuzzy)
         NavigationLink {

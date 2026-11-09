@@ -701,7 +701,8 @@ struct CapsKeyView: View {
   }
 }
 
-/// Google Pinyin `softkey_ci`: inputs the pinyin syllable separator ' while composing.
+/// Google Pinyin `softkey_ci`: inputs the pinyin syllable separator ' while composing. A long
+/// press locks caps instead, for mixed input with exact case.
 struct SeparatorKeyView: View {
   @Environment(\.colorScheme) var colorScheme
   let x: CGFloat
@@ -719,6 +720,9 @@ struct SeparatorKeyView: View {
         action: GestureAction(
           onOrderedKeyPress: {
             return { typeKey("'", "Quote") }
+          },
+          onLongPress: { _ in
+            vm.setLayer("shift", lock: true)
           }))
   }
 }
