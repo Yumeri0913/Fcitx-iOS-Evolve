@@ -43,13 +43,19 @@ extension GooglePinyinUserDict {
       }
     }
     let parsed = parse(try Data(contentsOf: url))
-    if parsed.entries.isEmpty {
+    if parsed.entries.isEmpty && parsed.english.isEmpty && parsed.typed.isEmpty {
       throw GooglePinyinDictError.noEntry
     }
     mkdirP(googlePinyinImportDirectory.path)
-    let file = googlePinyinImportDirectory.appendingPathComponent(
-      "import-\(UUID().uuidString).tsv")
-    try toTsv(parsed.entries).write(to: file, atomically: true, encoding: .utf8)
+    let base = googlePinyinImportDirectory.appendingPathComponent("import-\(UUID().uuidString)")
+    // English words and what was typed for each word go next to the pinyin words, merged
+    // by the keyboard together with them (googlepinyin_runtime.cpp)
+    try parsed.typed.map { "\($0.code)\t\($0.word)\t\($0.count)\n" }.joined()
+      .write(to: base.appendingPathExtension("typed"), atomically: true, encoding: .utf8)
+    try parsed.english.map { "\($0.word)\t\($0.count)\n" }.joined()
+      .write(to: base.appendingPathExtension("english"), atomically: true, encoding: .utf8)
+    try toTsv(parsed.entries).write(
+      to: base.appendingPathExtension("tsv"), atomically: true, encoding: .utf8)
     return parsed
   }
 

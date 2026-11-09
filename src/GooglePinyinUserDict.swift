@@ -29,10 +29,26 @@ enum GooglePinyinUserDict {
     var googlePinyin: String { syllables.joined(separator: " ") }
   }
 
+  /// An English word of at least two letters, typed letter by letter (`\0 a n d r o i d`).
+  struct EnglishEntry: Equatable {
+    let word: String
+    var count = 1
+  }
+
+  /// What was typed for a word and how often, abbreviations and mixed words included,
+  /// e.g. `xg` -> 香港, `bangm` -> 帮忙, `appli` -> app里. Letters only, lowercase.
+  struct TypedEntry: Equatable {
+    let code: String
+    let word: String
+    var count: Int
+  }
+
   struct ParseResult {
     let entries: [Entry]
-    /// Non-comment lines that could not be converted (English words, invalid pinyin…).
+    /// Non-comment lines that could not be converted (mixed words, invalid pinyin…).
     let skipped: Int
+    var english: [EnglishEntry] = []
+    var typed: [TypedEntry] = []
   }
 
   /// Full pinyin syllables accepted by libime without fuzzy flags.
@@ -216,11 +232,39 @@ enum GooglePinyinUserDict {
   static func parse(_ text: String) -> ParseResult {
     var order = [String]()
     var merged = [String: Entry]()
+    var englishOrder = [String]()
+    var english = [String: EnglishEntry]()
+    var typedOrder = [String]()
+    var typed = [String: TypedEntry]()
     var skipped = 0
     for line in lines(text) {
       if line.trimmingCharacters(in: .whitespaces).isEmpty || line.hasPrefix("#")
         || line.hasPrefix(";")
       {
+        continue
+      }
+      if let t = parseTypedLine(line) {
+        let key = t.code + "\t" + t.word
+        if var old = typed[key] {
+          old.count += t.count
+          typed[key] = old
+        } else {
+          typed[key] = t
+          typedOrder.append(key)
+        }
+      }
+      if let e = parseEnglishLine(line) {
+        // spellings of one word add up, the most used one wins
+        let key = e.word.lowercased()
+        if let old = english[key] {
+          english[key] =
+            e.count > old.count
+            ? EnglishEntry(word: e.word, count: e.count + old.count)
+            : EnglishEntry(word: old.word, count: old.count + e.count)
+        } else {
+          english[key] = e
+          englishOrder.append(key)
+        }
         continue
       }
       guard let entry = parseLine(line) else {
@@ -236,7 +280,80 @@ enum GooglePinyinUserDict {
         order.append(key)
       }
     }
-    return ParseResult(entries: order.map { merged[$0]! }, skipped: skipped)
+    return ParseResult(
+      entries: order.map { merged[$0]! }, skipped: skipped,
+      english: englishOrder.map { english[$0]! }, typed: typedOrder.map { typed[$0]! })
+  }
+
+  private static func fieldsOf(_ line: String) -> [String] {
+    (line.contains("\t")
+      ? line.split(separator: "\t", omittingEmptySubsequences: false)
+      : line.split(separator: " ", omittingEmptySubsequences: false))
+      .prefix(3).map { $0.trimmingCharacters(in: .whitespaces) }
+  }
+
+  private static func countOf(_ fields: [String]) -> Int? {
+    fields.first { matches(countRegex, $0) }
+      .flatMap { Int($0.trimmingCharacters(in: CharacterSet(charactersIn: ","))) }
+  }
+
+  private static func isLowerLetters(_ s: Substring) -> Bool {
+    !s.isEmpty && s.unicodeScalars.allSatisfy { ("a"..."z").contains($0) || $0 == "\u{fc}" }
+  }
+
+  /// An English word of at least two letters, as fcitx pinyin learns from raw input.
+  private static func parseEnglishLine(_ line: String) -> EnglishEntry? {
+    let fields = fieldsOf(line)
+    guard
+      let code = fields.first(where: {
+        $0.hasPrefix("\\0 ")
+          && $0.dropFirst(3).split(separator: " ").allSatisfy {
+            $0.count == 1 && isLowerLetters($0)
+          }
+      })
+    else {
+      return nil
+    }
+    let letters = code.dropFirst(3).replacingOccurrences(of: " ", with: "")
+    guard let word = fields.first(where: { $0.lowercased() == letters }), word.count >= 2 else {
+      return nil
+    }
+    return EnglishEntry(word: word, count: max(1, countOf(fields) ?? 1))
+  }
+
+  /// The typed letters of any entry that was used: pinyin (full or abbreviated), English
+  /// (`\0` marker) or both (`\16` switches back to pinyin). Digits are left out.
+  private static func parseTypedLine(_ line: String) -> TypedEntry? {
+    let fields = fieldsOf(line)
+    guard let count = countOf(fields), count > 0 else { return nil }
+    func isCode(_ f: String) -> Bool {
+      !f.isEmpty && !matches(countRegex, f)
+        && f.split(separator: " ").allSatisfy { isLowerLetters($0) || $0 == "\\0" || $0 == "\\16" }
+        && f.unicodeScalars.contains { ("a"..."z").contains($0) }
+    }
+    // an English word looks like a code too: prefer the one with a language marker, then the
+    // last one, which is where Google Pinyin writes it
+    guard
+      let codeIndex = fields.indices.last(where: { isCode(fields[$0]) && fields[$0].contains("\\") }
+      )
+        ?? fields.indices.last(where: { isCode(fields[$0]) })
+    else {
+      return nil
+    }
+    let code = fields[codeIndex].split(separator: " ").filter { !$0.hasPrefix("\\") }
+      .map { normalizeSyllable(String($0)) }.joined()
+    guard
+      let word = fields.indices.first(where: {
+        $0 != codeIndex && !fields[$0].isEmpty && !matches(countRegex, fields[$0])
+      }).map({ fields[$0] }), !code.isEmpty, !word.contains("\t")
+    else {
+      return nil
+    }
+    // single letters (mostly typed in English mode) would push away pinyin abbreviations
+    if word.count == 1, let c = word.lowercased().unicodeScalars.first, ("a"..."z").contains(c) {
+      return nil
+    }
+    return TypedEntry(code: code, word: word, count: count)
   }
 
   static func toLibimeText(_ entries: [Entry]) -> String {

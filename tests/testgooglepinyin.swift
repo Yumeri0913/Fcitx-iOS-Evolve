@@ -123,6 +123,34 @@ private func testSyllableTableMatchesLibime() {
   }
 }
 
+private func testParsesEnglishAndTypedCodes() {
+  let result = GooglePinyinUserDict.parse(
+    googleExport(
+      "香港\t907\txg",
+      "帮忙\t7\tbang m",
+      "app里\t1\t\\0 a p p \\16 li",
+      "Android\t449\t\\0 a n d r o i d",
+      "pro\t703\t\\0 p r o",
+      "Pro\t10\t\\0 p r o",
+      "x\t989\t\\0 x",
+      "103\t2\t\\300 1 0 3",
+      "堡\t0\tbao",
+      "香港\t3\txg"))
+  expect(
+    result.english == [
+      .init(word: "Android", count: 449), .init(word: "pro", count: 713),
+    ], "english: \(result.english)")
+  expect(
+    result.typed == [
+      .init(code: "xg", word: "香港", count: 910),
+      .init(code: "bangm", word: "帮忙", count: 7),
+      .init(code: "appli", word: "app里", count: 1),
+      .init(code: "android", word: "Android", count: 449),
+      .init(code: "pro", word: "pro", count: 703),
+      .init(code: "pro", word: "Pro", count: 10),
+    ], "typed: \(result.typed)")
+}
+
 @main
 struct GooglePinyinTests {
   static func main() {
@@ -133,6 +161,7 @@ struct GooglePinyinTests {
     testDoesNotMistakeLibimeTextForGoogle()
     testWritesGoogleFormatThatRoundTrips()
     testSyllableTableMatchesLibime()
+    testParsesEnglishAndTypedCodes()
     if failures > 0 {
       fatalError("\(failures) Google Pinyin user dictionary tests failed")
     }
