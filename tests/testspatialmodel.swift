@@ -38,7 +38,8 @@ private func testScoreIsGoogleGaussian() {
   let wMm = Float(w * 25.4 / dpi)
   let hMm = Float(h * 25.4 / dpi)
   let varX = 0.0075 * (1.5 * wMm) * (1.5 * wMm) + 1.68
-  let varY = 0.0108 * (1.5 * hMm) * (1.5 * hMm) + 1.33
+  // Vertical variance follows the key aspect ratio when that is larger.
+  let varY = max(0.0108 * (1.5 * hMm) * (1.5 * hMm) + 1.33, varX * (hMm / wMm) * (hMm / wMm))
   let peak = Float(log(1.0 / (2 * Double.pi * Double(varX * varY).squareRoot())))
   let center = CGPoint(x: k.rect.midX, y: k.rect.midY)
   expect(abs(model.score(k, center) - peak) < 1e-4, "peak")
@@ -73,6 +74,21 @@ private func testVerticalNeighborsAreIncluded() {
   expect(!alt.keys.contains("m") && !alt.keys.contains("p"), "no far keys")
 }
 
+private func testSameDepthIntoRowOrColumnNeighborCostsTheSame() {
+  // Moving 20% of the key away from the border with h (right) or t (above, staggered)
+  // makes the neighbor less likely by the same amount.
+  let g = key("g")
+  func penalty(_ x: CGFloat, _ y: CGFloat, _ neighbor: Character) -> Float {
+    let alt = model.alternatives("g", CGPoint(x: x, y: y))!
+    return alt.scores[0] - alt.scores[alt.keys.firstIndex(of: neighbor)!]
+  }
+  let toH =
+    penalty(g.rect.maxX - 0.2 * w, g.rect.midY, "h") - penalty(g.rect.maxX - 1, g.rect.midY, "h")
+  let toT =
+    penalty(g.rect.midX, g.rect.minY + 0.2 * h, "t") - penalty(g.rect.midX, g.rect.minY + 1, "t")
+  expect(abs(toH - toT) < 0.1, "row and column misses cost the same: \(toH) vs \(toT)")
+}
+
 private func testUnknownKeyGivesNothing() {
   expect(model.alternatives("1", .zero) == nil, "unknown key")
 }
@@ -84,6 +100,7 @@ struct SpatialModelTests {
     testTouchAtCenterRanksTouchedKeyFarAhead()
     testTouchOnBorderMakesNeighborAsLikely()
     testVerticalNeighborsAreIncluded()
+    testSameDepthIntoRowOrColumnNeighborCostsTheSame()
     testUnknownKeyGivesNothing()
     if failures > 0 {
       fatalError("\(failures) spatial model tests failed")

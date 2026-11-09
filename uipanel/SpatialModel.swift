@@ -13,6 +13,12 @@ struct KeyAlternatives: Equatable {
 /// centered on its cell, with a variance that grows with key size. For one touch,
 /// the touched key and nearby keys are scored by the log density at the touch point.
 ///
+/// One change from Google: the vertical variance grows at least with the key aspect
+/// ratio (varY >= varX * (h / w)^2). Google's formula fits keys about as tall as wide;
+/// for keys about 1.4 times as tall, a touch some way into the row above or below cost
+/// much more than the same miss into a left or right neighbor, so vertical typos were
+/// rarely corrected.
+///
 /// Coordinates are points of one view; [pointsPerMillimeter] converts them to mm.
 struct SpatialModel {
   struct Key {
@@ -58,7 +64,7 @@ struct SpatialModel {
     let w = mm(key.rect.width)
     let h = mm(key.rect.height)
     let varX = 0.0075 * (1.5 * w) * (1.5 * w) + 1.68
-    let varY = 0.0108 * (1.5 * h) * (1.5 * h) + 1.33
+    let varY = max(0.0108 * (1.5 * h) * (1.5 * h) + 1.33, varX * (h / w) * (h / w))
     let dx = mm(point.x - key.rect.midX)
     let dy = mm(point.y - key.rect.midY)
     let norm = Float(log(1.0 / (2.0 * Double.pi * Double(varX * varY).squareRoot())))
