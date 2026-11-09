@@ -112,7 +112,7 @@ index feb3865..959f7a7 100644
  }
  
 diff --git a/src/libime/pinyin/pinyincontext.cpp b/src/libime/pinyin/pinyincontext.cpp
-index ff6c69e..1ebadca 100644
+index ff6c69e..6950320 100644
 --- a/src/libime/pinyin/pinyincontext.cpp
 +++ b/src/libime/pinyin/pinyincontext.cpp
 @@ -146,6 +146,13 @@ bool hasCorrection(const SentenceResult &candidate) {
@@ -155,7 +155,7 @@ index ff6c69e..1ebadca 100644
      size_t alignCursorToNextSegment() const {
          FCITX_Q();
          auto currentCursor = q->cursor();
-@@ -477,18 +503,69 @@ bool PinyinContext::typeImpl(const char *s, size_t length) {
+@@ -477,18 +503,74 @@ bool PinyinContext::typeImpl(const char *s, size_t length) {
          }
      }
      auto changed = cancelTill(cursor());
@@ -187,6 +187,11 @@ index ff6c69e..1ebadca 100644
  
 +void PinyinContext::setPendingKeyAlternatives(KeyAlternatives alternatives) {
 +    pendingKeyAlternatives() = std::move(alternatives);
++}
++
++const PinyinContext::KeyAlternatives &
++PinyinContext::peekPendingKeyAlternatives() {
++    return pendingKeyAlternatives();
 +}
 +
 +const PinyinContext::KeyAlternatives *
@@ -226,7 +231,7 @@ index ff6c69e..1ebadca 100644
      // check if erase everything
      if (from == 0 && to >= size()) {
          FCITX_D();
-@@ -1091,10 +1168,15 @@ void PinyinContext::learn() {
+@@ -1091,10 +1173,15 @@ void PinyinContext::learn() {
      if (!selected()) {
          return;
      }
@@ -242,7 +247,7 @@ index ff6c69e..1ebadca 100644
          // Do not insert custom to history for the first time.
          if (result == LearnWordResult::Normal) {
              // Create new sentence with the whole new learned word.
-@@ -1113,9 +1195,32 @@ void PinyinContext::learn() {
+@@ -1113,9 +1200,32 @@ void PinyinContext::learn() {
          return;
      }
  
@@ -279,7 +284,7 @@ index ff6c69e..1ebadca 100644
  
  void PinyinContext::setContextWords(
 diff --git a/src/libime/pinyin/pinyincontext.h b/src/libime/pinyin/pinyincontext.h
-index d16c94e..c744e42 100644
+index d16c94e..711b303 100644
 --- a/src/libime/pinyin/pinyincontext.h
 +++ b/src/libime/pinyin/pinyincontext.h
 @@ -28,6 +28,13 @@ enum class PinyinPreeditMode;
@@ -296,7 +301,7 @@ index d16c94e..c744e42 100644
      PinyinContext(PinyinIME *ime);
      virtual ~PinyinContext();
  
-@@ -124,6 +131,32 @@ public:
+@@ -124,6 +131,35 @@ public:
      /// Add the selected part to history if selected() == true.
      void learn();
  
@@ -319,6 +324,9 @@ index d16c94e..c744e42 100644
 +     * right before delivering the key event on the same thread.
 +     */
 +    static void setPendingKeyAlternatives(KeyAlternatives alternatives);
++
++    /// The alternatives set for the key that will be typed next, if any.
++    static const KeyAlternatives &peekPendingKeyAlternatives();
 +
 +    /// Alternatives attached to the user input character at [index], if any.
 +    const KeyAlternatives *keyAlternatives(size_t index) const;
