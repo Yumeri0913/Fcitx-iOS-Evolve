@@ -206,8 +206,20 @@ struct SymbolView: View {
 
       TabView(selection: $page) {
         ForEach(pages) { symbolPage in
-          SymbolPageView(symbols: symbolPage.symbols, width: width, rowHeight: rowHeight)
-            .tag(symbolPage.id)
+          SymbolPageView(
+            symbols: symbolPage.symbols, width: width, rowHeight: rowHeight,
+            onSwipe: { direction in
+              // Keys take the touch, so a swipe across them turns the page itself.
+              withAnimation {
+                if direction == .left, page < pages.count - 1 {
+                  page += 1
+                } else if direction == .right, page > 0 {
+                  page -= 1
+                }
+              }
+            }
+          )
+          .tag(symbolPage.id)
         }
       }
       .tabViewStyle(.page(indexDisplayMode: .never))
@@ -228,6 +240,7 @@ private struct SymbolPageView: View {
   let symbols: [String]
   let width: CGFloat
   let rowHeight: CGFloat
+  let onSwipe: (SwipeDirection) -> Void
 
   var body: some View {
     let keyWidth = width / 10
@@ -249,7 +262,8 @@ private struct SymbolPageView: View {
                 if index >= 0, index < options.count {
                   commitSymbol(options[index])
                 }
-              }),
+              },
+              onSwipe: onSwipe),
             bubbleLabel: symbol, longPressItems: options.map { BubbleItem.text($0) })
       }
       // Google Pinyin: backspace ends the third row, 1.5 keys wide.
