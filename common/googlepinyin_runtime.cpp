@@ -68,11 +68,12 @@ std::string lowercase(std::string s) {
 // file of fcitx pinyin ("<key fields...>\t<count>\t<stamp>": user.typed is
 // code, word; user.english is word), keeping the larger count, the same as
 // InsightKey for Android. keyOf maps the key fields to what identifies an
-// entry.
+// entry. New entries get stamp 0 (never committed in fcitx, no boost as a
+// recent commit in user.typed) unless recentImports.
 template <typename KeyOf>
 void mergeLearnedFile(const std::string &importPath,
                       const std::string &learnedPath, size_t keyFields,
-                      KeyOf keyOf) {
+                      bool recentImports, KeyOf keyOf) {
     std::string content;
     if (!readFile(importPath.c_str(), content)) {
         return;
@@ -131,7 +132,7 @@ void mergeLearnedFile(const std::string &importPath,
             old.count = std::max(old.count, l.count);
             continue;
         }
-        l.stamp = ++stamp;
+        l.stamp = recentImports ? ++stamp : 0;
         index[key] = lines.size();
         lines.push_back(std::move(l));
     }
@@ -158,10 +159,10 @@ void mergeLearnedFile(const std::string &importPath,
 void mergeLearnedWords(const std::string &tsvPath, const std::string &dir) {
     auto base = tsvPath.substr(0, tsvPath.rfind('.'));
     mergeLearnedFile(
-        base + ".typed", dir + "/user.typed", 2,
+        base + ".typed", dir + "/user.typed", 2, false,
         [](const std::vector<std::string> &f) { return f[0] + '\t' + f[1]; });
     mergeLearnedFile(
-        base + ".english", dir + "/user.english", 1,
+        base + ".english", dir + "/user.english", 1, true,
         [](const std::vector<std::string> &f) { return lowercase(f[0]); });
 }
 
